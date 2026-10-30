@@ -1,9 +1,9 @@
 # free-tracker — Whole-app execution plan
 
-**Status:** Whole-app roadmap and S001–S003 change documents authored; other inventory documents remain pending. S001 code and S002 setup/tooling are integrated on local `dev`. Their dated handoff checks are historical, not current dependency delivery gates; see the bootstrap reconciliation in §8. S003's full preparation/recovery implementation remains planned; the focused dependency-policy/diagnostic-observation repair is recorded in its change document.
+**Status:** Whole-app roadmap and S001–S003 change documents authored; other inventory documents remain pending. S001 code and S002 setup/tooling are integrated on local `dev`. Their dated handoff checks are historical, not current dependency delivery gates; see the bootstrap reconciliation in §8. S003's bounded preparation/recovery implementation is now locally verified ([bootstrap evidence](s003-evidence.md)); separate review/integration and S004/GW remain unfulfilled. Its earlier focused dependency-policy/diagnostic repair remains historical evidence.
 
 **Updated:** 2026-10-30.  
-**Next action:** S003 consumes the integrated S001/S002 code/contracts, not their review histories, and must audit existing scripts before trusting them. S002's [setup notes](setup-decisions.md) retain identity/stack and resource context. Revalidate concrete physical, account, source and release evidence before their owning consumers; do not reopen predecessor administrative delivery gates.
+**Next action:** Deliver the locally verified S003 implementation through the separate bootstrap review/fix/integration workflow, then author S004 against its integrated contracts. The S003 script audit/limitations are documented; neither preparation success nor legacy helpers establish GW. S002's [setup notes](setup-decisions.md) retain identity/stack and resource context. Revalidate concrete physical, account, source and release evidence before their owning consumers; do not reopen predecessor administrative delivery gates.
 
 ## 1. Purpose, authority, and baseline
 
@@ -279,6 +279,10 @@ The inventory remains the initial workflow ledger; authoring does not advance it
 | Next action | Consume S002's [setup handoff](setup-decisions.md); separately review/fix/integrate this implementation, then S003 audits workflow bootstrap. Missing phone/account/release evidence stays assigned to its actual consumers; no delivery gate is advanced by local validation. |
 
 For document-authoring bookkeeping, maintain the **Change authoring progress** table below with columns `Change ID`, `Change file`, and `Authoring status`. Add or update only the selected change, using its exact §4 ID and a link to `changes/<slug>.md`, with status `authored`. Unlisted inventory changes remain `pending`. This table is a document-only summary, not the future machine-readable workflow schema. Authoring must not advance implementation, check, review, merge or requirement-validation status. Keep directly affected aggregate statements consistent when a document is authored.
+
+### S003 local bootstrap verification
+
+The [S003 evidence record](s003-evidence.md) binds implemented preparation/state/locking/resume behavior and its 40 unit plus 40 real-Git cases to exact revisions/content identities. Applicable tooling, worktree and app unit/coverage checks passed, including approved host retries after sandbox failures. This is local implementation/check evidence, not a new run ledger entry, separate review, commit, verified merge, GW pass or product/device validation. S004 must reuse the documented schema/locks/projection contract and complete the execution loop. The initial inventory/delivery fields above remain historical/unset until the owning workflow records actual delivery.
 
 ### Change authoring progress
 

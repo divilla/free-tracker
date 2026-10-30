@@ -638,3 +638,156 @@ fixer's stdin redirection is rendered on a separate line, so neither separator
 extends into that line. Codex runs in JSON mode so progress events remain
 streamable while their raw content is suppressed on success. If Codex fails,
 its captured output is printed to standard error for diagnosis.
+
+# Durable preparation — S003 (not delivery automation)
+
+From **any working directory**, use the script's actual repository path:
+
+```shell
+perl scripts/workflow-run.pl start 004-workflow-review-merge --worktree /new/path --local
+perl scripts/workflow-run.pl start 004-workflow-review-merge --worktree /new/path --remote origin
+perl scripts/workflow-run.pl status --run r-0123456789abcdef0123456789abcdef
+perl scripts/workflow-run.pl preflight --run r-0123456789abcdef0123456789abcdef
+perl scripts/workflow-run.pl resume --run r-0123456789abcdef0123456789abcdef
+```
+
+The example S004 change must first be authored and its prerequisites verified;
+these commands do not select pending work or author documents. Exactly one of
+`--local`/`--remote NAME` is required. Git, Perl (core JSON::PP, IO::Handle,
+Digest::SHA, Fcntl), Bash and Python 3 are required. The supported host must provide
+POSIX flock, fork/process groups, atomic rename and file/directory fsync.
+Local mode explicitly selects local `refs/heads/dev` and records remote freshness
+**not checked**. Remote mode uses configured authentication noninteractively and
+an explicit `+refs/heads/dev:refs/remotes/NAME/dev` fetch, even in restricted clones.
+It preserves local dev. Authentication/fetch failure never falls back to cached
+refs/local mode. Diagnostics suppress raw child output and credential-bearing URLs.
+Resume binds the effective remote URL by a private digest, never the URL itself;
+changed remote configuration blocks before fetching.
+No release branches are initialized; no remote refs are written.
+
+Start requires a clean caller checkout (including hidden untracked files and
+dirty submodules), a unique exact PLAN/change identity, absent change branch/run
+and nonexistent destination with a real existing parent. It never resets,
+stashes, switches, stages, commits, pushes, invokes Codex or dispatches a legacy
+flow. It creates only `change/<slug>` and its isolated worktree. Non-forcing
+checks repeat after refresh. Symlink/traversal destinations are rejected.
+
+## Prerequisite evidence representation (schema 1)
+
+For consumers with dependencies, an operator supplies the reviewed, scoped
+`agent/progress/prerequisites/<consumer-slug>.json` in the caller repository.
+It is an input, not a producer's review receipt or a gate inferred from prose.
+It must contain `schema: 1`, `consumer`, and a `dependencies` object keyed by
+**every direct and transitive dependency slug**. Each value contains:
+
+- `integration`: the unique full commit with exact subject
+  `Implement change <dependency-slug>`, reachable from the selected baseline.
+- `sources`: nonempty mapping of consumer-required repository-relative source
+  paths to SHA-256 of their exact Git blob bytes at the selected baseline.
+- `checks`: nonempty array of scoped observations: `scope`, full tested
+  `revision`, `result: "passed"`, numeric `exit: 0`, relative `artifact` and its
+  `sha256`. Each tested revision must exist and contain the same required source
+  bytes. The artifact must be readable and match its digest.
+
+The operator must choose the sources, commands/results and scope from the
+consuming contract, including concrete tool/device gates when applicable.
+The runner verifies identity, integration, contents and reported results; it
+cannot certify arbitrary assertions or that a manually supplied artifact is
+truthful. Unknown/failed/missing evidence blocks with owner/action. This format
+does not implement publisher exceptions: unmet prerequisites require actual
+evidence or a separately authorized contract amendment. Deferred phone/account
+obligations assigned to later consumers are not invented as current gates.
+Historical review receipts/handoffs are not required. No prerequisite record is
+fabricated by start. Diagnostic observations in `mch-workflow-evidence/` remain
+immutable and separate; their review labels are not readiness authority.
+
+## Runtime, projection and recovery contract (schema 1)
+
+Private authoritative runtime: common Git directory
+`codex-workflow-runs/<run-id>/state.json`; per-change stable OS lock:
+`codex-workflow-locks/<slug>.lock`. Run IDs are `r-` followed by 32 lowercase
+hexadecimal characters. Runtime directories/files use private permissions.
+Linked worktrees share identity and locks. Lock PID/host/time are diagnostics,
+not leases. Never delete a lock to steal ownership. A supervisor holds inherited
+ownership until active Git children exit, even after parent death. Plan dispatch
+locks and future S004 target merge locks are separate domains.
+Each prepared worktree's Git administration directory also retains a private
+`codex-workflow-owner.json` binding run/repository/branch/intent/path. A changed
+or missing established owner blocks. Only an explicit resume of initial creation
+intent may finish a missing marker after verifying the exact Git outcome.
+
+State retains identity/configuration, full original baseline/source/target/intent
+commits, generation, UTC timestamps, phase/previous_phase/phase_result, blockers
+(reason/owner/next action), prerequisites, observations, artifacts and projection
+metadata. Supported phases: `preparing`, `prepared`, `blocked`, `interrupted`.
+Checks/reviews start empty, merge null, implementation/review/merge/requirement
+gates `unmet`, `run_complete: false`. Supported extension fields are retained;
+unsupported schema/later evidence/phase, duplicate keys or corrupt JSON fail
+closed. Original baseline/configuration/identity cannot change on replacement.
+Generation comparison prevents stale replacement. Same-directory temporary
+write, checked full write/flush/fsync, atomic rename and directory fsync establish
+durability, including synchronization of newly created parent directories.
+Post-rename failure requires rereading disk; rollback is not assumed.
+
+Portable projection: prepared worktree
+`agent/progress/runs/<run-id>.json`. Runtime holds SHA-256 of its exact bytes and
+the matching generation. Projection holds sanitized identity/commits, local-only
+worktree marker, mode/freshness and unmet gates, never raw logs, host paths,
+remote URLs or secrets. Runtime reserves the snapshot before publication; a
+crash between them is explicitly unreconciled, not prepared success. Pending
+publication has its own generation/digest; `prepared`/`passed` is persisted only
+after the portable bytes are durable. Only exact
+run-owned projection bytes (current digest or retained prior publication digest)
+are permitted bookkeeping dirt. A tampered or unrelated progress file blocks
+and is never overwritten. Nothing is automatically staged. Legacy
+`codex-plan-runs/*.tsv`, plan lock, raw output and observation receipts are
+preserved, not imported as passing gates.
+
+`status` is read-only: no fetch, repair or file/ref mutation; it reports an
+active owner, cached Git observations and pending reconciliation. A valid blocked
+inspection may return 0; that is not approval. `preflight` locks, rechecks
+prerequisites and refreshes the configured target, recording observations without
+creating missing Git setup. `resume` additionally reconciles recorded intent:
+create once if no Git effect exists, or verify the owned branch/path/HEAD and
+finish publication after interruption. It never resets a baseline or restarts
+later phases. Changed source commits (even equal trees), changed target,
+missing/moved worktrees, configuration conflicts or ambiguous partial Git
+results block for operator/S004 reconciliation. Missing/corrupt runtime or legacy
+TSV alone cannot authorize resume. Inspect and preserve user work before any
+manual repair; never delete/reset a branch/worktree merely to retry start.
+
+JSON output separates `phase_result` from `run_complete: false`, naming run,
+slug, phase, baseline/source/target, blockers, next action and runtime/portable
+paths. Exit 0 means only the named phase/read passed; usage errors return 2,
+other failures 1, SIGINT 130, SIGTERM 143 after stopping active child work and
+best-effort interruption bookkeeping. SIGKILL can leave durable `preparing` or
+an unreconciled projection; explicitly resume, do not infer completion.
+
+## Bootstrap audit and S004 handoff
+
+S003 is preparation only; GW remains unmet until S004 proves the execution loop.
+Use **manual bootstrap** per agent/IMPLEMENT.md: verify baseline/dependencies,
+implement/check, separate full-diff review with durable finding dispositions,
+fix/recheck/re-review, then revalidate exact final source/target and serialize a
+direct squash into dev. The implementing skill does not commit/push/merge.
+
+Existing branch-create/create-change helpers switch the caller checkout and may
+initialize/publish release branches: not used here. `codex-plan-run.sh` retains
+queue TSV history and its outer plan lock, not a per-change gate ledger.
+`codex-flow-run.sh`, implementation/review launchers and Release.pm remain legacy
+helpers, not certified unattended IMPLEMENT delivery. S004 must wire this state
+and lock contract into bounded check/review/fix/retry/integration/merge recovery,
+safe staging and portable/PLAN publication. Progress.pm remains terminal-only;
+CodexSession.pm remains session extraction. No helper is deleted or silently
+relabeled conformant. Source/target drift invalidation cannot be bypassed by
+legacy success artifacts. Preparation tests do not prove app, SQLite, device,
+accuracy, publication or release gates.
+
+Independent deterministic checks (temporary Git repositories/local remotes,
+no live model or production remote):
+
+```shell
+perl scripts/test-unit-workflow-run-state.pl
+perl scripts/test-workflow-run-state.pl
+make workflow-test
+```

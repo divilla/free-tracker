@@ -1,5 +1,7 @@
 # S003 — Durable workflow preparation and run-state recovery
 
+**Current local implementation:** bounded preparation/state/locking/resume code and mapped tests are implemented and locally verified; see [S003 bootstrap evidence](../s003-evidence.md) for exact revisions, commands, content identity and limitations. Separate review/integration and S004/GW remain unfulfilled. The earlier bootstrap-only repair below is historical, not the current implementation boundary.
+
 > **Applied bootstrap correction (not full S003 completion):** The publisher
 > requested removal of predecessor review-history/handoff gates during this
 > branch. Baseline: branch `change/003-workflow-run-state`, HEAD
@@ -114,7 +116,7 @@ S003 implementation documents the audit/dispositions above in `scripts/README.md
 
 ### Preparation CLI
 
-The following **planned, not currently implemented** interface is the S004 handoff:
+The following implemented preparation-only interface is the S004 handoff; see [usage and schema details](../../scripts/README.md#durable-preparation--s003-not-delivery-automation):
 
 ```text
 perl scripts/workflow-run.pl start <slug> --worktree <new-path> --remote <name>
@@ -185,7 +187,7 @@ No app persistence, serialization, migration, tour-time, unit or sensor contract
 
 ## 6. Test cases and traceability
 
-All S003 tests below are **planned**, not existing or executed. `U` means the planned `scripts/test-unit-workflow-run-state.pl`; `G` means planned `scripts/test-workflow-run-state.pl`. Each `U :: name` is a concrete named Perl `Test::More` subtest; include requirement/case IDs in TAP output. Every row inherits **C00**. `G :: name` is an additional real temporary-Git behavioral subtest, not Android app E2E. Unit fixtures inject clocks, Git results and file faults; G uses actual repos/local bare remotes, paths with spaces, isolated Git config and recording/failing tool stubs. No production remote, real Codex/SSH key or user Git index is accessed. Test TAP plans must be nonempty, all required cases executed, no skipped/todo required cases and any failed assertion/child nonzero must fail the suite. Subvariants below require distinct assertions/diagnostics, not a single broad rejection assertion.
+All S003 cases below are now implemented and executed; see [current results](../s003-evidence.md). `U` means `scripts/test-unit-workflow-run-state.pl`; `G` means `scripts/test-workflow-run-state.pl`. Each `U :: name` is a concrete named Perl `Test::More` subtest; include requirement/case IDs in TAP output. Every row inherits **C00**. `G :: name` is an additional real temporary-Git behavioral subtest, not Android app E2E. Unit fixtures inject clocks, Git results and file faults; G uses actual repos/local bare remotes, paths with spaces, isolated Git config and recording/failing tool stubs. No production remote, real Codex/SSH key or user Git index is accessed. Test TAP plans must be nonempty, all required cases executed, no skipped/todo required cases and any failed assertion/child nonzero must fail the suite. Subvariants below require distinct assertions/diagnostics, not a single broad rejection assertion.
 
 | Case ID | Requirement(s) | Fixture, action, expected assertions | Unit test (`file :: name`) | Additional test / evidence |
 | --- | --- | --- | --- | --- |
@@ -236,9 +238,9 @@ All S003 tests below are **planned**, not existing or executed. `U` means the pl
 
 ## 7. Verification and completion gates
 
-### Implementation checks — all pending
+### Authored implementation-check obligations — current results linked
 
-No command in this table is claimed executed by authoring. Add the planned scripts/tests before using their commands. Both new Perl suites must report nonempty TAP with no required skips/todo, fail on assertion/child errors and collectively execute all mapped cases. Unit tests alone do not prove actual Git/locking/interruption behavior.
+No command in this table was claimed executed by authoring. The table retains its authoring-time result column below; those historical `Pending` values are superseded for local implementation checks by [the executed S003 evidence](../s003-evidence.md), not by inferred delivery gates. The scripts/tests are now present. Both new Perl suites must report nonempty TAP with no required skips/todo, fail on assertion/child errors and collectively execute all mapped cases. Unit tests alone do not prove actual Git/locking/interruption behavior.
 
 | Check | Exact command / procedure | Expected nonempty suite or evidence | Result / artifact |
 | --- | --- | --- | --- |
@@ -277,9 +279,9 @@ Authoring uses the publisher-approved local baseline above; only this document a
 | Source/template/scope review; `git diff --check` | Source audit and S003/S004 ownership checked against current helpers, governing documents and template; whitespace check exit 0. Saved document and selected PLAN authoring entry rechecked after bookkeeping. |
 | `make unit-test`; `make end-to-end-test`; planned S003 unit/real-Git suites; database/device/field/release checks | Not run for Markdown-only authoring. Existing Make commands are present, not unavailable placeholders or newly passing checks; future S003 suites do not yet exist. Implementation applicability and inherited failed/unverified gates remain as above. |
 
-- [ ] **Ready:** implementation rechecks dependency/remote/tool evidence and contracts; authoring exception does not waive inherited S002 failures.
-- [ ] **Implemented:** bounded preparation/resume/state/lock behavior and docs integrated; all planned named cases exist.
-- [ ] **Verified:** applicable unit/real-Git/regression/app coverage checks pass with genuine evidence and no skipped required cases.
+- [x] **Ready (local bootstrap):** exact dependency integration/source contracts, configured remote dev and applicable host/tool access rechecked; approved host unit/workflow retries passed. See the current evidence; no authoring exception waived a gate.
+- [x] **Implemented:** bounded preparation/resume/state/lock behavior and docs integrated; all planned named cases exist.
+- [x] **Verified:** applicable unit/real-Git/regression/app coverage checks pass with genuine evidence and no skipped required cases.
 - [ ] **Reviewed:** separate full-diff review, findings fixes/rechecks/commits and re-review completed per IMPLEMENT.
 - [ ] **Integrated:** exact final source/target checks/review and direct serialized squash into dev verified and recorded.
-- [ ] **Recorded:** genuine implementation progress/evidence linked; S004 handoff and remaining GW/device/database/release obligations explicit. Authoring satisfies none of these execution gates.
+- [x] **Recorded:** genuine implementation progress/evidence linked; S004 handoff and remaining GW/device/database/release obligations explicit. Authoring satisfied none of these execution gates. Checked implementation/verification entries now refer only to the linked local bootstrap evidence; separate review/integration and machine-owned delivery gates remain unset.
