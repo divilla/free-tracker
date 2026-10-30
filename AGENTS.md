@@ -5,6 +5,14 @@
 - Follow the architecture specified in [agent/ARCHITECTURE.md](agent/ARCHITECTURE.md).
 - Product requirements are defined in [agent/PRD.md](agent/PRD.md); implementation changes live in `agent/changes/<slug>.md`, where `<slug>` includes its number, starting with `agent/changes/001-build-scaffold.md`.
 
+## Change-authoring baseline policy
+
+- For documentation-only change authoring, including `$mch-change-write`, there is standing authorization to use the observed local Git baseline without requesting confirmation on every change. Record the exact current branch, `HEAD` and local `dev` commits; do not switch/reset branches or assume they are identical.
+- Inspect current code and dependency evidence. When Git and repository evidence explain an older PLAN baseline or stale aggregate status, reconcile only the directly affected baseline/reference wording automatically, preserving dated historical evidence. Such explainable drift is not an unresolved contradiction requiring a question. This policy takes precedence over the skill's blanket clarification rule for these cases.
+- Failed/unavailable tests, unchecked remote freshness and unverified review/merge/device/release gates may remain explicitly unmet in an authored document when the code/contracts needed to specify its scope are available. Record their evidence, owner and blocking implementation/validation gate; do not repeatedly ask permission merely to carry those obligations forward. Authoring does not require refreshing a remote or rerunning app suites solely to obtain approval to write documentation; unexecuted checks remain unexecuted, never passing.
+- Stop and ask when evidence cannot resolve a material authoring decision: invalid/ambiguous branch or PLAN identity, conflicting scope, divergent records without an evidential explanation, or missing dependency code/contracts/device findings necessary to define the change accurately. Never invent those contracts or promote predecessor documents/source presence into completed dependency evidence.
+- This authorization applies only to authoring and necessary PLAN/reference bookkeeping. It does not waive implementation readiness, testing, review, merge or product-validation gates, or authorize implementation, commits, merges, pushes or external actions.
+
 ## Testing requirements
 
 - Maintain unit tests for the application, domain/measurement, and data layers. Test observable behavior, boundary conditions, and failure paths—not merely that code executes.
