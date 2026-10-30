@@ -10,6 +10,7 @@ fake_bin="$test_root/bin"
 mkdir -p "$repo/scripts/lib/mch" "$repo/agent/changes" "$fake_bin"
 cp "$script_dir/codex-change-write.pl" "$repo/scripts/"
 cp "$script_dir/lib/mch/Progress.pm" "$script_dir/lib/mch/GitAuth.pm" "$repo/scripts/lib/mch/"
+cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/git-auth.sh" "$repo/scripts/"
 cp "$script_dir/test-lib/ssh-add" "$fake_bin/"
 export MCH_GIT_SSH_KEY="$test_root/test-key"
@@ -72,6 +73,7 @@ initial_head=$(git -C "$repo" rev-parse HEAD)
 run_change() {
 	local expected=$1
 	local status=0
+	rm -f -- "$CODEX_TEST_RESULT_PATH"
 	(
 		cd "$test_root"
 		"$repo/scripts/codex-change-write.pl"
@@ -92,6 +94,11 @@ run_change() {
 		[[ $(git -C "$repo" rev-parse HEAD) == "$initial_head" ]]
 	fi
 	if [[ -f "$CODEX_TEST_RESULT_PATH" ]]; then
+		if [[ ${CODEX_TEST_NO_SESSION:-0} == 1 ]]; then
+			grep -Fxq 'Codex session ID: unavailable (no valid thread.started event)' "$test_root/output"
+		else
+			[[ $(grep -Fxc "Codex session ID: $CODEX_TEST_SESSION" "$test_root/output") -eq 1 ]]
+		fi
 		[[ ! -e $(cat "$CODEX_TEST_RESULT_PATH") ]]
 		[[ ! -d $(dirname -- "$(cat "$CODEX_TEST_RESULT_PATH")") ]]
 	fi

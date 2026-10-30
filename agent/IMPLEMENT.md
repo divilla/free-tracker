@@ -49,6 +49,12 @@ dependency-ready change + latest dev
 
 ### Prepare and implement
 
+For the local S001 setup, see [development-environment.md](development-environment.md)
+for the replacement emulator, saved configuration, sandbox/host distinction and
+dated prerequisite checks. Recheck device identity, boot completion and remote
+baseline at resume time. A working environment does not satisfy app-test or
+delivery gates; unavailable Make suites remain failed/unmet checks.
+
 1. Verify prerequisites, change readiness, available tools/devices, and dependency completion. Establish the current `dev` baseline, refreshing from the configured remote when applicable. Record its exact commit; do not silently use a stale baseline after a refresh failure.
 2. Create `change/<slug>` from that baseline, preferably in an isolated worktree. Preserve unrelated user changes. An existing branch/run must be explicitly recognized as a resume, not overwritten or reset.
 3. Implement the change, its tests, and necessary documentation. Integration here means wiring the change into the existing app on the feature branch; it does not yet mean merging into `dev`.

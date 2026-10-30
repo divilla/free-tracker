@@ -10,10 +10,10 @@ use File::Temp qw(tempdir);
 use FindBin;
 use IO::Handle;
 use IO::Select;
-use JSON::PP qw(decode_json);
 use POSIX qw(WIFEXITED WIFSIGNALED WEXITSTATUS WTERMSIG setpgid);
 use lib "$FindBin::Bin/lib";
 use mch::Progress;
+use mch::CodexSession qw(session_id_from_output report_session_id);
 use mch::GitAuth qw(require_git_auth);
 
 STDOUT->autoflush(1);
@@ -219,32 +219,21 @@ sub monitor_command {
 	return $exit_code;
 }
 
-sub session_id_from_output {
-	my ($output) = @_;
-	for my $line (split /\n/, $output) {
-		my $event = eval { decode_json($line) };
-		next if ref($event) ne 'HASH' || ($event->{type} // '') ne 'thread.started';
-		my $id = $event->{thread_id};
-		return $id if defined $id && !ref($id) && $id =~ /\A[a-zA-Z0-9][a-zA-Z0-9_-]*\z/;
-	}
-	return;
-}
-
 sub run_codex {
 	my (@command) = @_;
 	print_command(@command);
 	my $progress = mch::Progress->new(terminal => -t STDOUT, output => \*STDOUT);
 	$active_output_log = File::Spec->catfile($temporary_dir, 'codex-output.log');
 	my $exit_code = monitor_command($progress, $active_output_log, @command);
+	$progress->finish($exit_code == 0 && $requested_exit_code == 0);
+	$codex_session_id = report_session_id(read_file($active_output_log));
 	if ($requested_exit_code != 0) {
-		$progress->finish(0);
 		unlink $active_output_log;
 		$active_output_log = undef;
 		print STDERR "codex-change-write: interrupted\n";
 		exit $requested_exit_code;
 	}
 
-	$progress->finish($exit_code == 0);
 	if ($exit_code != 0) {
 		print STDERR "codex-change-write: Codex command failed with exit code $exit_code\n";
 		if (-s $active_output_log) {
@@ -253,7 +242,6 @@ sub run_codex {
 			print STDERR "codex-change-write: Codex command output:\n$output";
 		}
 	}
-	$codex_session_id = session_id_from_output(read_file($active_output_log));
 	unlink $active_output_log;
 	$active_output_log = undef;
 	return $exit_code;

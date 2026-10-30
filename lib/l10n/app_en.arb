@@ -1,0 +1,12 @@
+{
+  "@@locale": "en",
+  "appTitle": "free-tracker",
+  "appInformation": "App information",
+  "loading": "Loading app information…",
+  "versionLabel": "Version",
+  "buildLabel": "Build number",
+  "applicationIdLabel": "Application ID",
+  "unavailable": "App information is unavailable. Please try again.",
+  "retry": "Retry",
+  "retrySemanticLabel": "Retry loading app information"
+}

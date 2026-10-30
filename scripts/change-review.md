@@ -27,6 +27,17 @@ review_pid=""
 stream_pid=""
 progress_pid=""
 progress_done_file=""
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+print_session_id() {
+    [[ ${session_reported:-false} != true ]] || return 0
+    local session_label
+    session_label=$(perl -I "$script_dir/lib" -Mmch::CodexSession=report_session_id \
+        -e 'local $/; report_session_id(<STDIN> // q{});' < "$stream_file")
+    printf '%s\n' "$session_label"
+    printf 'Pass %d %s\n' "$pass" "$session_label" >> "$metadata"
+    session_reported=true
+}
 
 stop_review() {
     trap - INT TERM HUP
@@ -49,6 +60,9 @@ stop_review() {
         wait "$stream_pid" 2>/dev/null || true
     fi
 
+    if [[ -n ${stream_file:-} && -f "$stream_file" ]]; then
+        print_session_id
+    fi
     printf '\nStopping review loop...\n' >&2
     exit 130
 }
@@ -136,6 +150,11 @@ if ! command -v codex >/dev/null 2>&1; then
     exit 1
 fi
 
+if ! command -v perl >/dev/null 2>&1; then
+    printf 'Error: perl is not installed or is not in PATH.\n' >&2
+    exit 1
+fi
+
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     printf 'Error: run this script inside a Git repository.\n' >&2
     exit 1
@@ -190,6 +209,7 @@ completed_passes=0
 stopped_cleanly=false
 
 for ((pass = 1; pass <= max_passes; pass++)); do
+    session_reported=false
     prompt_file="$output_dir/pass-${pass}-prompt.md"
     result_file="$output_dir/pass-${pass}-result.md"
     stream_file="$output_dir/pass-${pass}-stream.log"
@@ -254,6 +274,7 @@ EOF
     stream_pid=$!
 
     codex exec review \
+        --json \
         --ephemeral \
         --output-last-message "$result_file" \
         - < "$prompt_file" > "$output_pipe" 2>&1 &
@@ -279,6 +300,8 @@ EOF
     : > "$progress_done_file"
     wait "$progress_pid"
     progress_pid=""
+
+    print_session_id
 
     rm -f -- "$output_pipe" "$progress_events_file" "$progress_done_file"
     progress_done_file=""

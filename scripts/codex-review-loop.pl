@@ -13,6 +13,7 @@ use IO::Select;
 use POSIX qw(WIFEXITED WIFSIGNALED WEXITSTATUS WTERMSIG setpgid);
 use lib "$FindBin::Bin/lib";
 use mch::Progress;
+use mch::CodexSession qw(report_session_id);
 use mch::GitAuth qw(require_git_auth);
 
 STDOUT->autoflush(1);
@@ -276,15 +277,15 @@ sub run_codex {
 	my $progress = mch::Progress->new(terminal => -t STDOUT, output => \*STDOUT);
 	$active_output_log = File::Spec->catfile($findings_dir, 'codex-output.log');
 	my $exit_code = monitor_command($progress, $input_file, $active_output_log, @command);
+	$progress->finish($exit_code == 0 && $requested_exit_code == 0);
+	report_session_id(read_file($active_output_log));
 	if ($requested_exit_code != 0) {
-		$progress->finish(0);
 		unlink $active_output_log;
 		$active_output_log = undef;
 		print STDERR "codex-review-loop: interrupted\n";
 		exit $requested_exit_code;
 	}
 
-	$progress->finish($exit_code == 0);
 	if ($exit_code != 0) {
 		print STDERR "codex-review-loop: Codex command failed with exit code $exit_code\n";
 		if (-s $active_output_log) {

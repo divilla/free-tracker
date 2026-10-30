@@ -17,6 +17,7 @@ trap cleanup EXIT
 
 cp "$script_dir/codex-code-implement.pl" "$repo/scripts/codex-code-implement.pl"
 cp "$script_dir/lib/mch/Progress.pm" "$repo/scripts/lib/mch/Progress.pm"
+cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/lib/mch/GitAuth.pm" "$repo/scripts/lib/mch/GitAuth.pm"
 cp "$script_dir/git-auth.sh" "$repo/scripts/git-auth.sh"
 cp "$script_dir/test-lib/ssh-add" "$fake_bin/ssh-add"
@@ -39,12 +40,14 @@ set -euo pipefail
 [[ ${6-} == 'model_reasoning_effort="high"' ]]
 [[ ${7-} == -c ]]
 [[ ${8-} == 'service_tier="default"' ]]
-[[ ${9-} == -o ]]
-result=${10-}
-prompt=${11-}
-[[ $# -eq 11 ]]
+[[ ${9-} == --approve-for-me ]]
+[[ ${10-} == -o ]]
+result=${11-}
+prompt=${12-}
+[[ $# -eq 12 ]]
 
-printf '%s\n' '{"type":"started"}'
+printf '%s' '{"type":"thread.st'
+printf '%s\n' 'arted","thread_id":"implementation-session"}'
 if [[ ${CODEX_TEST_FAIL-} == 1 ]]; then
 	printf '%s\n' 'simulated implementation failure' >&2
 	exit 42
@@ -140,6 +143,7 @@ run_implementation "$first_output"
 	$(git -C "$repo" rev-parse origin/change/000-domain-types) ]]
 [[ $(<"$implementation_count") == 1 ]]
 grep -Fxq 'Branch: change/000-domain-types' "$first_output"
+[[ $(grep -Fxc 'Codex session ID: implementation-session' "$first_output") -eq 1 ]]
 awk -v repo="$repo" '
 $0 == "Repository: " repo {
 	if ((getline line) <= 0 || line != "Specification: agent/changes/000-domain-types.md") exit 1
@@ -150,7 +154,7 @@ $0 == "Repository: " repo {
 }
 END { if (!found) exit 1 }
 ' "$first_output"
-grep -Fq "codex exec --json --model gpt-6.1-sol -c 'model_reasoning_effort=\"high\"' -c 'service_tier=\"default\"' -o " "$first_output"
+grep -Fq "codex exec --json --model gpt-6.1-sol -c 'model_reasoning_effort=\"high\"' -c 'service_tier=\"default\"' --approve-for-me -o " "$first_output"
 grep -Fq "'\$mch-code-implement'" "$first_output"
 awk '
 /^-+$/ {
@@ -189,6 +193,7 @@ set +e
 failed_status=$?
 set -e
 [[ $failed_status -eq 42 ]]
+grep -Fxq 'Codex session ID: implementation-session' "$failed_output"
 [[ $(git -C "$repo" branch --show-current) == 'change/001-failing-change' ]]
 [[ $(git -C "$repo" rev-parse HEAD) == $(git -C "$repo" rev-parse master) ]]
 grep -Eq '^\[❌\] 00:00 •$' "$failed_output"

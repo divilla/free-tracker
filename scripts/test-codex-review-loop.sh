@@ -29,6 +29,7 @@ branch='change/001-test-change'
 mkdir -p "$repo/scripts/lib/mch" "$repo/agent/changes" "$fake_bin"
 cp "$script_dir/codex-review-loop.pl" "$repo/scripts/codex-review-loop.pl"
 cp "$script_dir/lib/mch/Progress.pm" "$repo/scripts/lib/mch/Progress.pm"
+cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/lib/mch/GitAuth.pm" "$repo/scripts/lib/mch/GitAuth.pm"
 cp "$script_dir/git-auth.sh" "$repo/scripts/git-auth.sh"
 cp "$script_dir/test-lib/ssh-add" "$fake_bin/ssh-add"
@@ -49,7 +50,7 @@ git -C "$repo" config user.email 'review-loop@example.invalid'
 git -C "$repo" remote add origin "$remote"
 printf '%s\n' 'initial' >"$repo/initial.txt"
 git -C "$repo" add initial.txt scripts/codex-review-loop.pl \
-	scripts/lib/mch/Progress.pm scripts/lib/mch/GitAuth.pm scripts/git-auth.sh scripts/commit-agent.pl
+	scripts/lib/mch/Progress.pm scripts/lib/mch/CodexSession.pm scripts/lib/mch/GitAuth.pm scripts/git-auth.sh scripts/commit-agent.pl
 git -C "$repo" commit -q -m initial
 git -C "$repo" push -q -u origin master
 git -C "$repo" branch stage
@@ -73,6 +74,8 @@ git -C "$remote" symbolic-ref HEAD "refs/heads/$branch"
 cat >"$fake_bin/codex" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+
+printf '{"type":"thread.started","thread_id":"session-%s"}\n' "$$"
 
 if [[ ${1-} == exec && ${2-} == review && ${3-} == --json ]]; then
 	shift 3
@@ -314,6 +317,8 @@ awk '
 }
 END { if (commands != 3 || inputs != 1) exit 1 }
 ' "$output"
+[[ $(grep -Ec '^Codex session ID: session-[0-9]+$' "$output") -eq 3 ]]
+[[ $(grep -E '^Codex session ID: session-[0-9]+$' "$output" | sort -u | wc -l) -eq 3 ]]
 printf -v expected_review_command \
 	'codex exec review --json --base %q --model gpt-6.1-sol%s -o %q' \
 	"$pinned_base" "$settings" "$findings_file"
@@ -340,6 +345,7 @@ grep -Fxq '=== Fix findings 01 ===' "$output"
 grep -Fxq 'Applied all valid review findings.' "$output"
 awk '
 /^\[✅\]/ {
+	if ((getline session) <= 0 || session !~ /^Codex session ID: session-[0-9]+$/) exit 1
 	if ((getline blank) <= 0 || blank != "") exit 1
 	completed++
 }
@@ -416,6 +422,7 @@ failed_findings_dir=${failed_findings_file%/*}
 [[ $failed_review_status -eq 42 ]]
 grep -Eq '^\[❌\] [0-9]+:[0-9]{2} •$' "$failed_review_output"
 grep -Fxq 'codex-review-loop: Codex command failed with exit code 42' "$failed_review_error"
+grep -Eq '^Codex session ID: session-[0-9]+$' "$failed_review_output"
 grep -Fxq 'codex-review-loop: Codex command output:' "$failed_review_error"
 grep -Fxq '  simulated Codex review failure' "$failed_review_error"
 [[ $(<"$review_count") == 3 ]]
@@ -669,6 +676,7 @@ fi
 [[ $interrupt_status -eq 143 ]]
 grep -Eq '^\[❌\] [0-9]+:[0-9]{2} •$' "$interrupt_output"
 grep -Fxq 'codex-review-loop: interrupted' "$interrupt_error"
+grep -Eq '^Codex session ID: session-[0-9]+$' "$interrupt_output"
 [[ ! -e "$interrupt_findings_dir" ]]
 [[ ! -e "$repo/findings.md" ]]
 [[ -s "$interrupt_child_pid" ]]

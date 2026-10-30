@@ -1,9 +1,9 @@
 # free-tracker — Whole-app execution plan
 
-**Status:** Whole-app change roadmap authored; all changes and implementation are pending.
+**Status:** Whole-app change roadmap and S001 change document authored; other inventory change documents and all implementation remain pending.
 
 **Updated:** 2026-10-30.  
-**Next action:** Draft `agent/changes/001-build-scaffold.md` for the executable code template that later changes use as their reference architecture. Resolve the publisher's application ID before generating the Android app shell.
+**Next action:** Revalidate [local environment evidence](development-environment.md), complete S001's remaining D03/D05 decisions, then implement [S001](changes/001-build-scaffold.md) using `com.bindefined.freetracker` and the configured `Free_Tracker_API_37` emulator. Environment recovery and authoring are not app implementation evidence.
 
 ## 1. Purpose, authority, and baseline
 
@@ -18,7 +18,7 @@ Governing documents, all used as references:
 
 Use [templates/change-template.md](templates/change-template.md) to author each change, alongside these governing documents and the repository instructions. Their external references are not revalidated by this planning task. Recheck changing platform requirements, dependencies, map terms, and release policies using current primary sources at the gates below.
 
-The repository currently contains planning documentation but no Flutter app, detailed changes, or root Makefile. A `scripts/` tree appeared during this planning task; its conformance to IMPLEMENT has not been audited or validated here. S003–S004 must inspect and reuse/adapt suitable existing tooling before adding anything, rather than assuming an empty scripts directory. IMPLEMENT's pending-automation status remains an unmet delivery gate, not a claim that no script files exist. `make unit-test` and `make end-to-end-test` are **unavailable**, not passing. No application tests, device trials, implementation reviews, merges, APKs, or releases are claimed here. Preserve unrelated working-tree changes.
+The repository currently contains planning documentation, including the authored [S001 change](changes/001-build-scaffold.md), and a root Makefile, but no Flutter app or app-test infrastructure. Both Make targets exist and report **unavailable** with exit 2; they are not passing app checks. A `scripts/` tree appeared during this planning task; its conformance to IMPLEMENT has not been audited or validated here. S003–S004 must inspect and reuse/adapt suitable existing tooling before adding anything, rather than assuming an empty scripts directory. IMPLEMENT's pending-automation status remains an unmet delivery gate, not a claim that no script files exist. [Local environment recovery](development-environment.md) records working host tooling, remote-baseline verification and a booted replacement emulator. It does not establish application tests, physical-device trials, implementation reviews, merges, APKs or releases. Preserve unrelated working-tree changes.
 
 ### Fixed scope
 
@@ -55,13 +55,13 @@ Documentation/infrastructure-only changes must explain check applicability as IM
 
 ## 3. Open decision and prerequisite register
 
-Every entry is initially **open**. Owners below are future changes, not completed decisions. On resolution record outcome, date, rationale, alternatives, current source links, tested revisions/devices, evidence, and affected changes. Update the PRD/architecture when a decision changes their documented direction; never silently override confirmed behavior.
+Entries remain **open** unless explicitly resolved below. Owners identify responsible changes, not completed implementation. On resolution record outcome, date, rationale, alternatives, current source links, tested revisions/devices, evidence, and affected changes. Update the PRD/architecture when a decision changes their documented direction; never silently override confirmed behavior.
 
 | ID | Decision/input | Owner and blocking point | Resolution evidence/constraint |
 | --- | --- | --- | --- |
-| D01 | Publisher's unique Android application ID | S001; before Android shell generation or signing; S002 carries the record forward | Publisher-supplied identifier; never invent domain ownership from the public name. |
-| D02 | Phones, test environment, map-account suitability | S002; before affected spike/integration | Available physical-device/capability inventory; existing authorized account suitability. No payment/account creation implied. |
-| D03 | Versions, API floor, ABIs, support matrix | S001 provisional, S005 extends, S006 final; before support claims | Maintained compatible Flutter/Dart/Android/dependencies. API 24 remains a proposal. Assess ARM64/ARM32/x86_64 where supported, older/low-memory and recent multi-vendor devices; recheck target SDK at release. |
+| D01 | Publisher's unique Android application ID | S001; before Android shell generation or signing; S002 carries the record forward | **Resolved 2026-10-30:** publisher explicitly selected `com.bindefined.freetracker` in this conversation; see [PRD §3](PRD.md#deferred-implementation-and-release-setup). Rationale: use publisher-selected identity, not an invented default; no alternative selected. Affects S001 scaffolding and S002/release identity records. No build/device validation or domain-ownership verification is claimed. |
+| D02 | Phones, test environment, map-account suitability | S002; before affected spike/integration | **Partial evidence 2026-10-30:** [replacement Android API 37 x86_64 emulator](development-environment.md) boots and is recognized by Flutter/ADB. Physical-device/capability inventory and authorized map-account suitability remain open. No payment/account creation implied. |
+| D03 | Versions, API floor, ABIs, support matrix | S001 provisional, S005 extends, S006 final; before support claims | [Installed local tool versions](development-environment.md) recorded 2026-10-30; compatible app dependencies, Gradle/AGP, pinning and build/support evidence remain open. API 24 remains a proposal; emulator API 37 is not an app minimum/target SDK decision. Assess ARM64/ARM32/x86_64 where supported, older/low-memory and recent multi-vendor devices; recheck target SDK at release. |
 | D04 | Service ownership and sensor/location adapters | S006; before production recording/UI-heavy work | Real-phone screen-off/UI-detachment/recovery proof; service-hosted Dart versus focused native bridge. One owner and one implementation per rule. Any computation relocation requires architecture update and deterministic replay. |
 | D05 | Presentation state management and SQLite binding | S001 establishes template patterns, S005 selects SQLite binding, S006/S009 validate; before production consumers | One presentation approach, constructor injection, maintained binding/migration tooling; no speculative framework. |
 | D06 | GPS-loss time, endpoints, interruption semantics | S007; before gap/time/recovery implementation | Resolve proposed continuing active time during GPS loss; define unknown intervals, clock/reboot handling, first/last fix versus temporal endpoints, and recovery/end options without fabricated end/path/time. |
@@ -72,7 +72,7 @@ Every entry is initially **open**. Owners below are future changes, not complete
 | D11 | Diagnostic retention and Android backup/privacy | S021; before release | Preserve summaries/routes; explicit backup rules and SDK disclosures; no silent cloud backup or new deletion/export/route-upload feature. |
 | D12 | Signing ownership, accounts, disclosures and release testing | S002 identify, S024/S025 fulfill; before distribution | Secure key/upgrade identity; upload versus app-signing certificate; current account-specific obligations, policy URL/support contact, and authorization for external actions. |
 
-Missing D01 blocks app scaffolding, not workflow tooling/planning. Missing phones blocks the physical spike, not deterministic test preparation. Missing map-account access allows evaluating a compliant zero-cost alternative, never a paid fallback or invented billing verification.
+D01 is resolved; use `com.bindefined.freetracker` for app scaffolding. Missing phones blocks the physical spike, not deterministic test preparation. Missing map-account access allows evaluating a compliant zero-cost alternative, never a paid fallback or invented billing verification.
 
 ## 4. Delivery gates and change inventory
 
@@ -96,7 +96,7 @@ All inventory rows start **planned**. Paths are relative to `agent/`; branches a
 
 | Change / path | Slug | Dependencies | Output and integration ownership | Specific verification |
 | --- | --- | --- | --- | --- |
-| S001 / `changes/001-build-scaffold.md` | `001-build-scaffold` | —; D01 before Android shell generation | Build a minimal executable Flutter/Dart code template implementing ARCHITECTURE: feature-first organization, composition in `app/`, plain-Dart application/domain/measurement boundaries, constructor-injected ports and thin data/platform adapters. Include a small tested reference slice, localization-ready shell, stable Make runners and extension guidance linking actual code. This code is the reference architecture for later changes, not merely documentation, empty folders or a disposable demo. No tour recording, sensor/service feasibility, production schema or map implementation. | Analyze/build the template; observable unit tests for the reference slice and adapter success/failure paths, shell Android E2E, coverage and runner failure checks. Enforce AGENTS policy for all handwritten logic; no placeholder passes. C01, C30, C36. |
+| S001 / `changes/001-build-scaffold.md` | `001-build-scaffold` | —; D01 resolved: `com.bindefined.freetracker` | Build a minimal executable Flutter/Dart code template implementing ARCHITECTURE: feature-first organization, composition in `app/`, plain-Dart application/domain/measurement boundaries, constructor-injected ports and thin data/platform adapters. Include a small tested reference slice, localization-ready shell, stable Make runners and extension guidance linking actual code. This code is the reference architecture for later changes, not merely documentation, empty folders or a disposable demo. No tour recording, sensor/service feasibility, production schema or map implementation. | Analyze/build the template; observable unit tests for the reference slice and adapter success/failure paths, shell Android E2E, coverage and runner failure checks. Enforce AGENTS policy for all handwritten logic; no placeholder passes. C01, C30, C36. |
 | S002 / `changes/002-setup-decisions.md` | `002-setup-decisions` | S001 | Carry forward confirmed publisher identity and template stack; record resources, remaining decisions/evidence, support/release prerequisites and source-verification procedure. No duplicate scaffold or invented thresholds. | Setup/applicability evidence; C01, C02, C35. |
 | S003 / `changes/003-workflow-run-state.md` | `003-workflow-run-state` | S002 | Script entry points/configuration, durable state, worktree/branch setup, baseline capture, ownership locking, resume/preflight. | Temporary-Git-repo tests for dirty/unrelated files, existing runs, failed refresh, concurrent runs and interruptions; C00. |
 | S004 / `changes/004-workflow-review-merge.md` | `004-workflow-review-merge` | S003 | Script test/commit/review/fix loop, evidence binding, retries, refresh/integration and serialized squash/bookkeeping; usage docs. | Failed/empty/malformed review, failed tests, finding disposition, exhausted loops/no progress, changed dev/source, conflicts, stale evidence, interrupted/duplicate merge; C00. |
@@ -225,7 +225,7 @@ S025 must attach evidence for every PRD §13 checkbox. The mapping follows its c
 
 ### Bootstrap without circular claims
 
-1. S001 builds and tests the reference code template first, using a documented manual equivalent of IMPLEMENT until automation is proven. Resolve D01 before generating the Android shell; do not guess identity or claim device feasibility. Introduce stable Make targets with genuine template unit/coverage and Android shell E2E suites; report missing tooling/device as failure. S002 then validates setup records and remaining prerequisites without rebuilding the template.
+1. S001 builds and tests the reference code template first, using a documented manual equivalent of IMPLEMENT until automation is proven. D01 is resolved: generate the Android shell with `com.bindefined.freetracker`; do not substitute an identity or claim device feasibility. Introduce stable Make targets with genuine template unit/coverage and Android shell E2E suites; report missing tooling/device as failure. S002 then validates setup records and remaining prerequisites without rebuilding the template.
 2. S003–S004 audit existing scripts against IMPLEMENT, then adapt/complete and validate automation before relying on it to own delivery. Document a manual equivalent of IMPLEMENT's branch, checks, separate review/fix and merge gates for missing or unproven capabilities. Test with temporary repositories/injected tools and record bootstrap revision evidence. Reconcile existing script artifact conventions with the ledger contract before choosing paths. Do not claim unavailable/unverified scripts or app tests passed. Separate PR-style review need not be a hosted PR.
 3. After S004 passes GW, scripts own subsequent sequencing/durable records. Prose cannot override failed gates. Split bootstrap changes if needed without losing tests/integration responsibility.
 4. S005 extends S001's genuine Flutter suites/Make targets with real SQLite integration and full layer-suite checks, verifies failure propagation and coverage enforcement, then passes actual commands. Missing required device/tooling keeps its gate unmet.
@@ -246,7 +246,7 @@ Remote pushing/hosted PR creation is not implicit; scripts must configure it exp
 
 ### Progress ledger
 
-The inventory is the initial ledger: **all changes planned; no inventory change documents or implementation/test/review/merge evidence are recorded here yet**. Future scripts must maintain machine-readable records under `agent/progress/` (schema/entry points owned by S003–S004) and link concise summaries here. Keep raw sensor data, large logs and secrets outside automatic staging; record stable artifact locations/integrity identifiers as appropriate.
+The inventory is the initial ledger: **all app implementation remains planned; S001 document authoring and [local environment evidence](development-environment.md) are recorded, with no passing app-test/review/merge evidence**. The root Makefile currently fails explicitly for unavailable suites. Future scripts must maintain machine-readable records under `agent/progress/` (schema/entry points owned by S003–S004) and link concise summaries here. Keep raw sensor data, large logs and secrets outside automatic staging; record stable artifact locations/integrity identifiers as appropriate.
 
 | Per-change field | Meaning / initial state |
 | --- | --- |
@@ -260,9 +260,15 @@ The inventory is the initial ledger: **all changes planned; no inventory change 
 | Review | Rounds/findings/dispositions and clean-review evidence bound to source/target commits; absent. |
 | Merge | Verified squash commit and bookkeeping state; unset. |
 | Requirement validation | `pending`, `partial`, `validated`, with remaining obligations; all pending. |
-| Next action | Concrete work/prerequisite owner; draft S001 (`001-build-scaffold`) first. |
+| Next action | Concrete work/prerequisite owner; implement the S001 (`001-build-scaffold`) authored contract using confirmed application ID `com.bindefined.freetracker`; verify remaining stack, presentation, tooling and device prerequisites. |
 
-For document-authoring bookkeeping, create a **Change authoring progress** table here when the first change is successfully authored, with columns `Change ID`, `Change file`, and `Authoring status`. Add or update only the selected change, using its exact §4 ID and a link to `changes/<slug>.md`, with status `authored`. Unlisted inventory changes remain `pending`; no document is authored by this planning revision. This table is a document-only summary, not the future machine-readable workflow schema. Authoring must not advance implementation, check, review, merge or requirement-validation status. Keep directly affected aggregate statements consistent when a document is authored.
+For document-authoring bookkeeping, maintain the **Change authoring progress** table below with columns `Change ID`, `Change file`, and `Authoring status`. Add or update only the selected change, using its exact §4 ID and a link to `changes/<slug>.md`, with status `authored`. Unlisted inventory changes remain `pending`. This table is a document-only summary, not the future machine-readable workflow schema. Authoring must not advance implementation, check, review, merge or requirement-validation status. Keep directly affected aggregate statements consistent when a document is authored.
+
+### Change authoring progress
+
+| Change ID | Change file | Authoring status |
+| --- | --- | --- |
+| S001 | [changes/001-build-scaffold.md](changes/001-build-scaffold.md) | authored |
 
 Only machine-verified workflow gates advance automatically. Merged does not mean product-validated: indoor arithmetic may be integrated while its field-accuracy obligation remains pending. Keep missing device/account evidence visible, with separate implementation and requirement-validation status.
 

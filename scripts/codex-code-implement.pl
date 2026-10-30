@@ -13,6 +13,7 @@ use IO::Select;
 use POSIX qw(WIFEXITED WIFSIGNALED WEXITSTATUS WTERMSIG setpgid);
 use lib "$FindBin::Bin/lib";
 use mch::Progress;
+use mch::CodexSession qw(report_session_id);
 use mch::GitAuth qw(require_git_auth);
 
 STDOUT->autoflush(1);
@@ -223,15 +224,15 @@ sub run_codex {
 	my $progress = mch::Progress->new(terminal => -t STDOUT, output => \*STDOUT);
 	$active_output_log = File::Spec->catfile($temporary_dir, 'codex-output.log');
 	my $exit_code = monitor_command($progress, $active_output_log, @command);
+	$progress->finish($exit_code == 0 && $requested_exit_code == 0);
+	report_session_id(read_file($active_output_log));
 	if ($requested_exit_code != 0) {
-		$progress->finish(0);
 		unlink $active_output_log;
 		$active_output_log = undef;
 		print STDERR "codex-code-implement: interrupted\n";
 		exit $requested_exit_code;
 	}
 
-	$progress->finish($exit_code == 0);
 	if ($exit_code != 0) {
 		print STDERR "codex-code-implement: Codex command failed with exit code $exit_code\n";
 		if (-s $active_output_log) {
@@ -321,6 +322,7 @@ sub main {
 	my $status = run_codex(
 		'codex', 'exec', '--json', '--model', 'gpt-6.1-sol',
 		'-c', 'model_reasoning_effort="high"', '-c', 'service_tier="default"',
+		'--approve-for-me',
 		'-o', $result_file, $prompt,
 	);
 	exit $status if $status != 0;

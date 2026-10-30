@@ -2,6 +2,39 @@
 
 This directory contains maintained, user-owned helpers for working with the mch repository. These files are intentional project tooling, not generated output or repository-hygiene candidates. Do not delete or relocate them without explicit user approval.
 
+## Codex session IDs
+
+Every `codex exec` invocation in `codex-change-write.pl`,
+`codex-code-implement.pl`, `codex-review-loop.pl` (each review and fix), and the
+Bash helper `change-review.md` uses JSON output and prints a separate line:
+
+```text
+Codex session ID: <codex-session-id>
+```
+
+The shared `lib/mch/CodexSession.pm` reads the first valid `thread.started`
+event's `thread_id` from captured output. The ID is printed after command
+progress finishes, before result handling or output cleanup, including failure
+and interruption paths. Diagnostics, malformed JSON, unrelated events and
+unsafe IDs are ignored. If no ID was emitted, the line explicitly reports
+`unavailable (no valid thread.started event)`; no ID is invented or taken from
+the parent environment, and the existing command exit status is preserved.
+Authoring reuses the captured ID for interactive recovery as before.
+
+`change-review.md` additionally records each pass's session ID in `run-info.txt`.
+It retains its existing `--ephemeral` option: printing an ID does not make that
+ephemeral session resumable. The flow/plan wrappers inherit IDs from their
+child launchers; `codex-resume.sh` does not start a new `codex exec`.
+
+The JSON event format is described in the
+[official OpenAI documentation](https://learn.chatgpt.com/docs/non-interactive-mode).
+Controlled checks (no live Codex calls) include:
+
+```shell
+perl scripts/test-codex-session.pl
+bash scripts/test-change-review.sh
+```
+
 ## Git authentication
 
 Before running a workflow that fetches or pushes, load your SSH key into the
@@ -386,6 +419,18 @@ specification, and branch values are blue, magenta, and green respectively.
 
 The implementation runs as `codex exec --json` with `gpt-6.1-sol`, high reasoning,
 and the standard (`default`) service tier set explicitly on its command line.
+It also explicitly passes `--approve-for-me`: the implementation stays in the
+workspace-write sandbox, but can request automatically reviewed escalation for
+host Flutter SDK/cache writes, Android/ADB access, and remote baseline checks.
+This prevents non-interactive runs from being unable to request the access
+needed for prerequisite verification. It does not grant unrestricted access or
+guarantee approval; managed policy and reviewer denials still apply. Use a Codex
+CLI version supporting this flag; see the
+[official non-interactive permissions documentation](https://learn.chatgpt.com/docs/non-interactive-mode)
+and [automatic review](https://learn.chatgpt.com/docs/sandboxing/auto-review).
+Sandbox-denied checks should be retried through that approval mechanism before
+declaring host prerequisites unavailable; genuine missing/stale evidence still
+blocks implementation. Authoring and review launch policies are unchanged.
 It writes the final response with `-o <temporary-result>` and invokes
 `$mch-code-implement` without a document-path argument. The skill matches the
 current branch against `^change/([0-9][0-9][0-9]+-[a-z0-9-_]+)$` and uses

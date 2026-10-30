@@ -10,7 +10,7 @@ This is the self-contained product requirements document for **free-tracker**. I
 
 - **Confirmed requirements** define the required product scope. Section 2 assigns stable `PR-xx` identifiers; later sections specify behavior and acceptance in detail.
 - **Proposals and candidates** (including technology choices, the API floor, numerical accuracy targets, and GPS-loss timing policy) remain subject to the stated engineering validation. They must not be represented as confirmed user decisions or demonstrated results.
-- **Deferred setup** is tracked in Section 3. The public app name is settled; the publisher's technical application ID is not.
+- **Deferred setup** is tracked in Section 3. The public app name and publisher's technical application ID are settled; remaining release setup is pending.
 - **External references** and dated pricing/platform/policy evidence are retained from the source material, not independently revalidated during this conversion. Recheck them at the implementation and release gates identified below.
 - **Document-task boundary:** this change creates Markdown documentation only. It does not scaffold an app, install dependencies, build an APK, create accounts, configure payments, or publish anything. Those product deliverables are future roadmap work.
 
@@ -77,7 +77,7 @@ Success is evaluated through the metrics and verification matrix in Section 11 a
 | Pausing | Optional automatic pause, initially off; manual controls always available | Persist the user's opt-in preference, distinguish automatic/manual pause reasons, and show both active and total elapsed time. |
 | Battery | Higher use accepted for accuracy | Use an accuracy-first acquisition profile and validate heat/endurance on older and newer phones. |
 | Tour duration | No app-imposed limit | No automatic ending or truncation based on elapsed time. Long-running reliability and battery measurements are engineering tests, not a user-defined duration cap. |
-| App identity | free-tracker | Use this exact public app name; defer the unique Android application ID to release setup without inventing publisher ownership. |
+| App identity | free-tracker | Use this exact public app name and publisher-confirmed Android application ID `com.bindefined.freetracker`. |
 | App pricing/advertising | Free with no ads | No paid access, advertising SDKs, or ad placements. |
 | Map licensing/provider | Zero cost only; Google Maps permitted | No paid plans, overage charges, or paid map features. Recommend only the no-charge native Maps SDK configuration; any OSM alternative must also meet the zero-cost constraint. |
 | Distance semantics | Horizontal-distance recommendation accepted | Do not add elevation noise to outdoor distance. |
@@ -89,7 +89,7 @@ Success is evaluated through the metrics and verification matrix in Section 11 a
 
 The indoor fallback, automatic-pause default, maximum tour length, app name, map budget, and SQLite storage choice are settled as recorded above; do not reopen them as unanswered product preferences.
 
-- **Android application ID:** the public name is confirmed as `free-tracker`; the unique technical package identifier is not yet supplied. Confirm it with the publisher before app scaffolding/signing; do not invent a domain or treat the display name as the package ID. This is a setup dependency, not an unresolved public app name.
+- **Android application ID — resolved (2026-10-30):** the publisher explicitly instructed in this conversation: “use com.bindefined.freetracker as application ID”. Use `com.bindefined.freetracker` for app scaffolding and signing; retain `free-tracker` as the public name. This resolves PLAN D01 by publisher choice, not inferred domain ownership. No alternative identifier was selected; signing keys, accounts, builds, and publication remain pending.
 - **Map account setup:** the recommended no-charge Google configuration still requires a billing-enabled account, as disclosed in Section 9. This PRD does not authorize account creation or payment setup; if that setup is unsuitable later, evaluate only a zero-cost alternative.
 
 Implementation-time engineering decisions, rather than unanswered user preferences: exact supported API floor, dependency versions, calibration thresholds, test-device selection, and map integration details. Choose them from evidence within the confirmed broad-compatibility and accuracy goals.
@@ -415,11 +415,11 @@ Urban canyons, tree cover, tunnels, and indoor spaces require separately reporte
 
 ## 12. Delivery roadmap and release requirements
 
-These milestones sequence delivery of the requirements. They are future work, not evidence of an implemented or released app. [PLAN.md](PLAN.md) starts with `001-build-scaffold`: a working code template used as the reference architecture by later changes, not a product-feature implementation. Confirm the publisher application ID before generating its Android shell; carry remaining setup work forward without duplicating the scaffold.
+These milestones sequence delivery of the requirements. They are future work, not evidence of an implemented or released app. [PLAN.md](PLAN.md) starts with `001-build-scaffold`: a working code template used as the reference architecture by later changes, not a product-feature implementation. Use the publisher-confirmed application ID `com.bindefined.freetracker` when generating its Android shell; carry remaining setup work forward without duplicating the scaffold.
 
 | Phase | Work | Exit condition |
 | --- | --- | --- |
-| 0 — Confirm implementation setup | Carry forward the settled requirements: free-tracker, no indoor fallback/manual entry, automatic pause initially off, no app-imposed duration limit, free/ad-free app, zero-cost maps. Confirm the publisher's technical application ID before scaffolding and verify map-account prerequisites. | Setup details recorded without reopening answered product questions or introducing paid maps. |
+| 0 — Confirm implementation setup | Carry forward the settled requirements: free-tracker, application ID `com.bindefined.freetracker`, no indoor fallback/manual entry, automatic pause initially off, no app-imposed duration limit, free/ad-free app, zero-cost maps. Use the confirmed ID for scaffolding and verify map-account prerequisites. | Setup details recorded without reopening answered product questions or introducing paid maps. |
 | 1 — Prove Android tracking and compatibility | Foreground-service/location/sensor/persistence spike on representative phones; examine metadata, sensor availability, Google services, and lifecycle limits; select adapters and supported API floor. | Screen-off recording and durable recovery demonstrated for supported modes; capability matrix and architecture chosen from evidence. |
 | 2 — Establish measurement baseline | Capture outdoor and selected indoor reference tours; implement baselines/replay; compare GPS filters, indoor calibration, and automatic-pause detection; document tuning. | Reproducible mode-specific error/battery measurements and initial calibrated measurement strategies. |
 | 3 — Complete tour lifecycle/storage | Durable Start/Pause/Resume/End, consistent timers, recovery, history, and migrations. | Every started tour is preserved; completed tours reopen with correct start/end/distance. |

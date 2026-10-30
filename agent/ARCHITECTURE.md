@@ -221,7 +221,7 @@ Resolve these with evidence during delivery:
 - Map renderer/provider and non-Google-device behavior, within the zero-cost constraint.
 - GPS-loss time policy, calibration/filter thresholds, automatic-pause parameters, diagnostic retention, and backup policy.
 
-Carry forward the PRD's application-ID setup dependency before scaffolding; do not invent a publisher identity. This architecture does not authorize account/payment setup or publication.
+Use the publisher-confirmed Android application ID `com.bindefined.freetracker` (PRD §3; PLAN D01 resolved 2026-10-30) when scaffolding; do not substitute an invented publisher identity. This architecture does not authorize account/payment setup or publication.
 
 Do not add accounts, cloud synchronization, route planning, wearables, manual indoor tour-distance entry, offline-map downloads, or other excluded product features. Do not create speculative plugin systems, separate packages for every feature, duplicate DTO/domain models without a useful distinction, or use-case classes that only forward a call.
 

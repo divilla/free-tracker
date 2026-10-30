@@ -91,6 +91,7 @@ for helper in create-change-branch.sh codex-change-write.pl codex-code-implement
 done
 mkdir -p "$repo/scripts/lib/mch" "$test_root/bin"
 cp "$script_dir/lib/mch/Progress.pm" "$script_dir/lib/mch/GitAuth.pm" "$script_dir/lib/mch/Release.pm" "$repo/scripts/lib/mch/"
+cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/test-lib/ssh-add" "$test_root/bin/"
 export PATH="$test_root/bin:$PATH"
 export MCH_GIT_SSH_KEY="$test_root/test-key"
@@ -104,21 +105,25 @@ review=0
 if [[ $1 == review ]]; then review=1; shift; fi
 result=''
 prompt=''
+auto_approve=0
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		-o) result=$2; shift 2 ;;
 		--base|--model|-c) shift 2 ;;
 		--json) shift ;;
+		--approve-for-me) auto_approve=1; shift ;;
 		*) prompt=$1; shift ;;
 	esac
 done
 [[ -n $result ]]
 change="agent/changes/$FLOW_TEST_SLUG.md"
 if [[ $review -eq 1 ]]; then
+	[[ $auto_approve -eq 0 ]]
 	[[ -r $change ]]
 	printf '%s\n' review >>"$FLOW_TEST_CALLS"
 	printf '%s\n' 'No issues found.' >"$result"
 elif [[ $prompt == '$mch-change-write' ]]; then
+	[[ $auto_approve -eq 0 ]]
 	[[ ! -e $change ]]
 	printf '%s\n' author >>"$FLOW_TEST_CALLS"
 	if [[ ${FLOW_TEST_NO_AUTHOR:-0} == 0 ]]; then
@@ -128,6 +133,7 @@ elif [[ $prompt == '$mch-change-write' ]]; then
 	fi
 	printf '%s' 'Done.' >"$result"
 elif [[ $prompt == '$mch-code-implement' ]]; then
+	[[ $auto_approve -eq 1 ]]
 	[[ -r $change ]]
 	printf '%s\n' implement >>"$FLOW_TEST_CALLS"
 	printf 'Implemented behavior for %s\n' "$FLOW_TEST_SLUG" >implementation.txt
