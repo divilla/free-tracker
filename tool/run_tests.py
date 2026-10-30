@@ -17,7 +17,8 @@ import check_scaffold
 UNIT_PATHS = ['test/settings/domain', 'test/settings/application', 'test/settings/data',
               'test/settings/presentation', 'test/app']
 CORE_PATHS = UNIT_PATHS[:2]
-E2E_PATHS = ['integration_test/app_info_test.dart', 'integration_test/app_info_platform_test.dart']
+E2E_PATHS = ['integration_test/app_info_test.dart', 'integration_test/app_info_platform_test.dart',
+            'integration_test/change_cases_test.dart']
 
 
 def machine_results(output, paths):
@@ -137,7 +138,8 @@ class Runner:
                 for index, path in enumerate(E2E_PATHS):
                     output = self.command(['flutter', 'test', '--machine', '-d', device, path], reports / f'android-{index}.jsonl')
                     summary = machine_results(output, [path])
-                    required = [f'S001_E{i:02}_' for i in range(1, 11)] if index == 0 else ['S001_P01_']
+                    required = ([f'S001_E{i:02}_' for i in range(1, 11)] if index == 0
+                                else ['S001_P01_'] if index == 1 else [])
                     if any(not any(n.startswith(prefix) for n in summary['tests']) for prefix in required):
                         raise ValueError('required Android scenario did not execute')
                     result['suites'].append(summary)

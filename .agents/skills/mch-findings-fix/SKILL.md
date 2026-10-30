@@ -72,8 +72,10 @@ or conflicts with a protected contract, report the blocker rather than guessing.
   spec-status table. Do not mark delivery or implementation gates complete.
 - Validate links, requirements, acceptance scenarios, test traceability, and
   consistency with the project documents. Inspect the full edit set to confirm
-  that it is document-only. App tests are not required for this prose-only pass;
-  report applicable document checks and any unavailable app tooling accurately.
+  that it is document-only. Both `make unit-test` and `make end-to-end-test`
+  must still run and pass before this findings-fix pass can be finished. Planned
+  changes remain planned in test scope; authoring does not require executing
+  their future implementation. Never exempt the existing suites as prose-only.
 - Do not require an existing implementation or an implementation-log block.
   When findings need code changes, report them as outside document mode instead
   of silently implementing them.
@@ -97,8 +99,19 @@ Fix valid findings with the smallest complete implementation change, including
 meaningful regression tests and directly affected documentation or fixtures.
 Follow the architecture and applicable contracts; resolve contract conflicts
 before editing. Do not rewrite the change merely to excuse a code defect.
-Run targeted checks and all applicable repository-required tests and coverage
-thresholds. Fix failures caused by the changes and report unrelated failures.
+For every test-case row, maintain a distinct named E2E test executed by
+`make end-to-end-test`, in addition to its unit coverage. Add missing per-case
+tests through the real app/CLI boundary, map `file :: test name` in the selected
+change, and keep `tool/test_scope.json` complete for implemented changes.
+Run targeted checks, then **both** `make unit-test` and `make end-to-end-test`
+against the final fixes. Both must actually execute all configured suites and
+pass, including coverage and case traceability, before work is finished.
+Continue fixing authorized code/tests until both pass, including failures
+discovered while verifying; "unrelated" failure is not a completion exemption.
+Never weaken assertions, skip required cases, shrink scope or mark E2E N/A.
+Missing tooling/devices are unmet gates, not passes. In document mode preserve
+its editing boundary; a failure requiring code changes outside that mode means
+the pass is not finished, not permission to silently implement the feature.
 
 When code-mode fixes change the repository, append statistics to the latest
 matching change block in repository-root `implementation-log.md`. If no block
@@ -122,5 +135,6 @@ as zero lines. Do not log when all findings are rejected, resolved, or blocked.
 
 Summarize fixed, rejected, and blocked findings, the selected mode, changed
 files, and verification. Declare completion only when every finding is fixed
-or explicitly rejected and applicable checks pass. Keep blockers visible; a
+or explicitly rejected and both complete Make suites and other required checks
+have actually passed on the final result. Keep blockers visible; a
 blocked or no-change pass must not be presented as a clean review.

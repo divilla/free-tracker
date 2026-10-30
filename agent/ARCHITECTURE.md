@@ -198,6 +198,14 @@ Externalize visible strings, including notification and permission text, from th
 
 Architecture is useful only if its boundaries protect observable behavior.
 
+Every change test-case row maps to unit coverage and at least one distinct
+E2E test executed by `make end-to-end-test`. Rows specify a fixture, public
+action and observable assertions/recovery. Android tests cover app behavior;
+isolated host process/CLI tests cover tooling. Unit/private calls and manual
+evidence are not substitutes. Both complete Make suites must pass before
+implementation or findings fixes are finished, including documentation/tooling
+passes. Continue authorized fixes until they pass; never skip or shrink scope.
+
 | Level | Required evidence |
 | --- | --- |
 | Pure rule tests | GPS rejection/continuity, pause boundaries, indoor baselines, calibration, timing, pace, and deterministic replay |

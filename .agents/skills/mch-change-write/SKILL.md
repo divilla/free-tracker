@@ -82,8 +82,17 @@ claim they are answered. If it is unclear whether they block authoring, ask.
    references. Keep the change bounded to that scope and grounded in the current
    repository. Set the template's change ID to the matched PLAN ID, and its slug
    and branch metadata to the captured slug and actual current branch.
-3. Map requirements and cases to named unit tests and applicable E2E, real
-   SQLite, platform/device, and field checks. Distinguish planned tests from
+3. Write each test-case row as an executable fixture/precondition, real app/CLI
+   action, observable assertions and recovery contract. Give it a stable case
+   ID, a named unit test, and at least one distinct planned E2E test in the
+   required `E2E test (file :: name)` column (use the template's exact heading).
+   One case row requires at least one separate E2E test; do not substitute unit
+   tests, manual evidence, or a single shared catch-all E2E test. Planned E2E
+   tests must be convertible to executable Android or isolated host-command
+   tests and wired into `make end-to-end-test` during implementation. No
+   documentation/infrastructure exemption applies to per-case E2E. Keep real
+   SQLite, platform/device and field evidence as additional obligations.
+   Do not add an authored-only change to implemented test scope. Distinguish planned tests from
    existing tests and executed evidence. Preserve the repository's coverage and
    failure policies; document applicability for non-application work. Do not
    claim tests pass or check implementation gates merely because they are

@@ -1,5 +1,7 @@
 # Setup decisions and prerequisite handoff — S002
 
+> **Current completion policy (2026-10-31):** This record preserves dated evidence. Current implementation/findings-fix completion requires both complete Make suites to pass and a distinct executed E2E test for every implemented change-case row; see [IMPLEMENT §4](IMPLEMENT.md#4-verification-and-completion-gates). Historical N/A/not-run results below are not exemptions.
+
 Recorded 2026-10-30 UTC. This is a local consistency/resource inventory, not proof
 of phone support, account suitability, accuracy, release readiness or workflow delivery.
 S002 extends the [existing scaffold](reference-scaffold.md) under the

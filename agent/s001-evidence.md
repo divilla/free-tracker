@@ -1,5 +1,7 @@
 # S001 implementation evidence
 
+> **Current completion policy (2026-10-31):** This record preserves dated evidence. Current implementation/findings-fix completion requires both complete Make suites to pass and a distinct executed E2E test for every implemented change-case row; see [IMPLEMENT §4](IMPLEMENT.md#4-verification-and-completion-gates). Historical N/A/not-run results below are not exemptions.
+
 Recorded 2026-10-30 21:17 UTC on Fedora 43 x86_64.
 This is implementation/check evidence, not a script-owned delivery-gate update.
 

@@ -1,5 +1,7 @@
 # Executable reference scaffold
 
+> **Test extension contract (2026-10-31):** Every new change case needs unit coverage and a distinct real-boundary E2E test mapped in its row. Both `make unit-test` and `make end-to-end-test` must pass before implementation/findings fixes finish. Register implemented changes in `tool/test_scope.json`; host-command E2E supplements, never replaces, Android and physical validation.
+
 S001 resumes `change/001-build-scaffold` at `4fbda4b`; readiness verified against
 local and remote `dev` `4129ed7af7dbf063c8220ca13b8299779a61b09b` on 2026-10-30.
 There is no predecessor dependency. GA is an output, not a prerequisite.

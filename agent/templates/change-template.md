@@ -47,11 +47,20 @@ Write observable, independently verifiable requirements, including acceptance be
 
 ## 6. Test cases and traceability
 
-Expand each independently failing condition into a case, including normal, boundary, invalid-input, and failure/recovery paths. Name concrete tests/assertions—not only directories. Every requirement and case needs an identifiable unit test; user-facing scenarios also need E2E tests.
+Expand each independently failing condition into a case, including normal,
+boundary, invalid-input and failure/recovery paths. Each row describes a
+controllable fixture/precondition, real app/CLI action, observable assertions
+and recovery. Every requirement and case needs unit coverage. **One case row
+requires at least one distinct named E2E test**, including infrastructure and
+documentation cases. No shared catch-all, unit-call relabeling, manual-only or
+N/A substitute. Android tests cover app behavior; isolated real-command/system
+tests cover tooling. Put the case ID in both test names and name the exact E2E
+file/test. Implementation registers the change in `tool/test_scope.json`;
+planned authoring does not activate tests for unimplemented code.
 
-| Case ID | Requirement(s) / Cxx | Fixture, action, expected assertions | Unit test (`file :: name`) | Additional test / evidence |
-| --- | --- | --- | --- | --- |
-| SNNN-T01 | SNNN-R01; Cxx | <controlled inputs/clock/fault; action; exact expected result> | `<path> :: <test name>` | <named E2E / real SQLite / platform-device / field test> |
+| Case ID | Requirement(s) / Cxx | Fixture, action, expected assertions | Unit test (`file :: name`) | Additional test / evidence | E2E test (`file :: name`) |
+| --- | --- | --- | --- | --- | --- |
+| SNNN-T01 | SNNN-R01; Cxx | <controlled fixture; public action; exact assertions and recovery> | `<path> :: <case-ID unit name>` | <additional SQLite / physical-device / field evidence> | `<integration_test/..._test.dart or end_to_end/test_....py> :: <distinct case-ID E2E name>` |
 
 For documentation/infrastructure-only work, explain check applicability. Separate executable requirements from external evidence obligations: test validators/logic, but never present mocks or checklists as device/field proof.
 
@@ -61,14 +70,14 @@ For documentation/infrastructure-only work, explain check applicability. Separat
 | --- | --- | --- | --- |
 | Unit + coverage | `make unit-test` | Application/domain/data tests; 100% handwritten application/domain/measurement line coverage; branch coverage separately where supported | <pending> |
 | Real SQLite | <command, including how unit workflow invokes it> | Applicable mappings, transactions, rollback, recovery and migrations | <pending / justified N/A> |
-| Android E2E | `make end-to-end-test` | Mapped user-facing success/failure/recovery cases; configured emulator/device | <pending / justified N/A> |
+| End-to-end | `make end-to-end-test ANDROID_DEVICE_ID=...` | Every implemented row has a distinct executed passing host CLI/system or Android E2E test; retained Android suites run on the configured device | <pending; cannot be N/A> |
 | Other | <analysis/build/device/field/document validation command or procedure> | <required assertions, environment/devices and evidence> | <pending / justified N/A> |
 
 Record revision, command/exit status, environment/tool versions, coverage and artifact locations. Missing required tooling/devices, test failure or unexpectedly empty suites must fail; unavailable commands are not passes. Document narrow coverage exceptions with reasons; generated-code exclusions still require serialization/persistence/migration tests.
 
 - [ ] **Ready:** dependencies/evidence checked, blocking decisions resolved, contracts and cases reviewed against current baseline.
 - [ ] **Implemented:** scoped behavior integrated; every requirement/case mapped to actual tests; docs/migrations updated.
-- [ ] **Verified:** applicable checks pass; required database/device/field evidence exists; no weakened assertions or skipped required tests.
+- [ ] **Verified:** both complete `make unit-test` and `make end-to-end-test` runs pass on the final result, including per-row traceability; continue implementing/fixing until they do. Additional required database/device/field evidence exists; no weakened assertions, skipped cases, reduced scope or unrelated-failure waiver.
 - [ ] **Reviewed:** separate full-diff review completed; actionable findings fixed, checks rerun and fixes re-reviewed per IMPLEMENT.
 - [ ] **Integrated:** latest `dev` incorporated; checks/review bound to exact final source and target commits; squash merge verified and recorded per IMPLEMENT.
 - [ ] **Recorded:** PLAN/progress and affected decisions/contracts updated; remaining external validation obligations and next consumer identified. Merged is not automatically product-validated.

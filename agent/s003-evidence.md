@@ -1,5 +1,7 @@
 # S003 — Local bootstrap implementation evidence
 
+> **Current completion policy (2026-10-31):** This record preserves dated evidence. Current implementation/findings-fix completion requires both complete Make suites to pass and a distinct executed E2E test for every implemented change-case row; see [IMPLEMENT §4](IMPLEMENT.md#4-verification-and-completion-gates). Historical N/A/not-run results below are not exemptions.
+
 Recorded 2026-10-30 UTC for [003-workflow-run-state](changes/003-workflow-run-state.md).
 This is implementation/check evidence, **not** a review, merge, GW pass, or
 product/device validation record. No commit, push, merge or real preparation run
@@ -116,3 +118,56 @@ are N/A to this infrastructure-only change, not passed or waived for their actua
 consumers. No production prerequisite manifest/run/projection or delivery gate
 was fabricated. The README defines the manifest representation; a future
 consumer must supply truthful scoped source/check evidence before preparation.
+
+## Per-case E2E policy update — 2026-10-31 local
+
+Verified at **2026-10-30 23:21 UTC** (2026-10-31 Europe/Zagreb), on branch
+`change/003-workflow-run-state`, HEAD
+`16b8de1845c1de479ed90191740adfa20e3c00e1` plus the uncommitted policy/test changes;
+local `dev` remained `f9f8273b4ed76f00285dcd9b586b534c904d6bda`. No remote
+refresh, commit, push or merge was performed. The older infrastructure-only
+E2E N/A observation above is historical, not the current completion policy.
+
+Every implemented case row now has a distinct executable E2E mapping. The
+implemented test inventory is S000–S003: **93 cases** (1 + 31 + 20 + 41).
+Authoring future rows names convertible tests but does not activate unimplemented
+code. This inventory is test configuration, not a delivery-status ledger.
+
+| Command | Observed result and scope |
+| --- | --- |
+| `make unit-test` | Exit 0; 73 Python tooling, 32 pure-core and 53 Flutter tests; workflow unit suites and helper units also passed; executed unit names cover all 93 case rows |
+| `make end-to-end-test ANDROID_DEVICE_ID=emulator-5554` | Exit 0; 77 host public-command/system E2E tests, 27 Android tests (legacy E01–E10/P01 plus 16 distinct Txx scenarios), and the complete retained workflow regression target; executed E2E file/name pairs cover all 93 rows |
+| `flutter analyze` | Exit 0; no issues |
+| `python3 tool/check_case_contract.py` | Exit 0; 93 unique named case mappings, distinct E2E names and existing implemented test files; this audit alone is not execution proof |
+| `python3 tool/check_scaffold.py`; three edited skills' `quick_validate.py`; `git diff --check` | All exit 0 |
+
+Handwritten Dart coverage remains **103/103 lines (100%)**. Branch coverage is
+unavailable, not 100%. The unit and Android summaries have the same app/test/tool
+source SHA-256:
+`611f176bc34642f2c6dc330211012d91647f3760b8bead678959aee1620c7670`.
+The broader 133-file source/test/contract inventory SHA-256 is
+`24322d43b351566daad6e0b0055d41356585bdd581267f6b4c79f3a94e6ba4d2`:
+sorted tracked plus nonignored untracked files under `.agents/skills/mch-*`,
+`agent/changes/`, `agent/templates/`, `lib/`, `android/`, `test/`,
+`integration_test/`, `end_to_end/`, `tool/`, `scripts/`, plus root AGENTS/Makefile,
+PRD/ARCHITECTURE/PLAN/IMPLEMENT and app configuration files; hash filename, NUL,
+exact bytes, NUL per file. Evidence records themselves are excluded.
+
+New host E2E tests use actual subprocesses, real temporary Git repositories,
+files and locks, with controlled SDK-boundary responses only for runner-policy
+cases. They do not relabel unit calls as E2E or claim real app success from
+fake SDK reports. The Android suite runs the app/feature scenarios on the
+existing API 37 x86_64 emulator, including real metadata reads and expanded
+localization at narrow width/200% text scaling. No physical sensing, background,
+field accuracy, SQLite, maps or release validation is claimed.
+
+Initial fixture failures (missing fake-SDK Git executable, a table-separator
+mutation and a schema mutation that did not alter the fixture) and the outdated
+two-Android-suite assertion were repaired without weakening production checks.
+The final complete gates passed. Sandbox Flutter-cache/ADB access was denied;
+approved host access was used, and the existing emulator was started. Local
+replaceable reports are `build/test-results/{unit,e2e,change-unit,change-e2e}/`;
+full command logs are `/tmp/free-tracker-per-case-unit-complete.txt`,
+`/tmp/free-tracker-per-case-e2e-final.txt` and
+`/tmp/free-tracker-per-case-analyze.txt`. This section retains the portable
+summary if those local artifacts disappear.

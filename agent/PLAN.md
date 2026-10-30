@@ -47,7 +47,7 @@ This documentation task performs no future implementation or external release ac
 2. Scope/non-goals and stable requirements such as `S010-R01`, linked to originating `PR-xx` and §6 scenario IDs.
 3. Observable behavior, acceptance scenarios, failure/recovery and degraded/unavailable states; clearly distinguish confirmed behavior from decisions resolved by the change.
 4. Interfaces, feature ownership, dependency boundaries, affected storage/migrations, event ordering/time semantics, and configuration/versioning.
-5. Stable cases such as `S010-T01`, fixtures and boundary conditions; a mapping from **every requirement and every specified test case** to an identifiable unit test. Add mapped E2E for user-facing behavior and real-database, platform, and field evidence as applicable. These levels do not replace each other.
+5. Stable cases such as `S010-T01`, fixtures and boundary conditions; map every requirement and case to unit coverage and every case row to at least one distinct named E2E test executed by `make end-to-end-test`. Android covers app behavior and host-command E2E covers tooling. Add applicable real-database, platform and field evidence; these levels do not replace each other.
 6. Exact validation commands, expected nonempty suites, coverage scope, devices/environments, evidence artifacts, and completion gates.
 7. Integration/migration responsibilities, risks, unresolved prerequisites, and the next consumer of the resulting contracts/evidence.
 
@@ -216,6 +216,16 @@ S025 must attach evidence for every PRD §13 checkbox. The mapping follows its c
 ## 7. Verification policy and bootstrap
 
 ### Required commands and evidence
+
+- **Per-case completion policy (2026-10-31):** every case row is an executable
+  fixture/action/assertion contract with unit coverage and at least one
+  distinct named E2E test run by `make end-to-end-test`, including documentation
+  and tooling cases. Both Make suites must run and pass before implementation
+  or findings-fix work is finished; continue authorized fixes until they do.
+  No shared catch-all, skipped case, reduced scope, N/A or unrelated-failure
+  waiver. `tool/test_scope.json` registers implemented changes, not delivery
+  status; future authored rows name convertible tests activated at implementation.
+  Additional physical/device/field obligations remain separate.
 
 - `make unit-test`: application, domain/measurement and data unit suites, fail on unexpectedly empty required suites, enforce **100% line coverage by default** for handwritten application/domain/measurement logic. Explicitly document any narrow exception/reason. Exercise decisions and report branch coverage separately where supported; line coverage is neither branch coverage nor correctness proof.
 - Exclude genuinely generated code only, while testing its serialization/persistence/migrations. Manually maintained generated code is handwritten. Never weaken assertions, exclude logic or skip cases to meet coverage.

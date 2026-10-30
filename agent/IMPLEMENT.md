@@ -91,18 +91,49 @@ PR-style review does not require a hosted PR. Remote pushing or PR creation, if 
 
 ## 4. Verification and completion gates
 
+Every case row must be convertible to a real app/CLI E2E scenario: controllable
+fixture, public action, observable assertions and recovery, with a stable case
+ID. Each row needs unit coverage **and at least one distinct named E2E test**
+in its `E2E test (file :: name)` column. Several rows cannot share a catch-all.
+Host tests invoke real commands with isolated repositories/files; Android
+tests exercise app behavior on the configured emulator/device. Calling unit
+or private methods in another runner is not E2E. Additional database,
+physical-device and field evidence remains required where specified.
+
+Both Make targets must actually run all configured nonempty suites and pass
+before any implementation or findings-fix pass is finished, including
+document-only findings fixes. Continue authorized implementation/fixing until
+both pass. Infrastructure/N/A, "unrelated failure", skipped tests and reduced
+scope are not completion exemptions. An unavoidable external blocker means
+unfinished. Authoring alone still does not claim implementation results.
+
+`tool/test_scope.json` is an implemented-test inventory, not a delivery ledger.
+Implementers add the selected change and all its cases; future document authoring
+does not activate unimplemented tests. `tool/case_contract.py` audits every
+document's mapping and enforces executed unit/E2E identities for that inventory.
+`make unit-test` runs app/tooling and workflow unit suites; `make end-to-end-test`
+runs host-command tests and all Android suites, then rejects missing per-row
+coverage. Reports are under `build/test-results/change-unit/` and `change-e2e/`
+alongside the app reports. Older dated N/A observations are historical, not
+current completion exemptions.
+
 Scripts must enforce the policy in `AGENTS.md`, including:
 
 - `make unit-test`: application, domain/measurement, and data tests; 100% handwritten application/domain line coverage by default, with only explicitly documented narrow exceptions; branch coverage reported separately where supported.
 - Real SQLite integration checks for transactions, recovery, and migrations, automated as part of the test workflow. Mock-only evidence is insufficient.
-- `make end-to-end-test`: implemented user-facing functionality and its acceptance/failure/recovery scenarios on the configured Android emulator/device.
+- `make end-to-end-test`: a distinct executed E2E test for every implemented case row, plus retained app acceptance/failure/recovery scenarios on the configured Android emulator/device. Host-command E2E covers tooling, never Android/device proof.
 - Applicable static analysis, build, platform/device, and physical-device/field validation required by the change and architecture.
 
 Every change requirement and specified test case needs identifiable unit-test coverage. User-facing behavior also needs mapped end-to-end coverage. Generated code exclusions do not remove serialization, persistence, or migration verification obligations.
 
 Record each check's command, exit status, tested revision, environment/device, and evidence location. Missing required tools/devices, unexpectedly empty suites, failures, or absent required physical-device evidence leave the relevant gate unmet. Do not silently skip tests, weaken assertions, or treat unavailable checks as passing.
 
-Documentation-only and infrastructure-only changes must state which checks apply and why; this cannot be used to exempt implemented application behavior. Until the app/test infrastructure exists, the two Make targets are **unavailable**, not passing placeholders. Future release/device gates must remain visible in the plan even when they do not block a particular earlier change.
+Documentation-only and infrastructure-only changes explain which additional
+database/device/field checks apply, but both complete Make suites remain
+mandatory. Host E2E covers their own public-command contracts while retained
+Android suites still run. Missing infrastructure means an unmet gate, never a
+passing placeholder. Future release/device gates remain visible at their owning
+stage even when they do not block an earlier deterministic tooling change.
 
 A merged change is not automatically a completed product requirement. Mark a requirement complete only when all its implementation and validation obligations are satisfied. Whole-app completion additionally requires the PRD acceptance and release gates; a set of clean reviews is insufficient.
 

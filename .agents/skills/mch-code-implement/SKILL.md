@@ -93,15 +93,33 @@ Do not commit or push; the caller handles commits.
    documentation, and fixtures. Avoid unrelated cleanup and speculative design.
 5. Do not introduce a public or shared type, function, method, schema, or other
    external contract until the repository's contract-change process is met.
-6. Give every acceptance-criteria bullet a meaningful test. Avoid redundant
-   tests unless they prove a distinct criterion or regression.
+6. Give every requirement and acceptance criterion meaningful unit coverage.
+   For **each test-case row** in the selected change, add at least one distinct
+   end-to-end test with that stable case ID in its name. No row may be covered
+   solely by unit tests, a manual check, or an E2E test shared with another row.
+   Exercise the row's fixture, action, observable result and failure/recovery
+   through the real app/CLI boundary; do not relabel unit calls as E2E. Use
+   Android integration tests for app behavior and isolated real-command/system
+   tests for tooling. Record the exact `file :: test name` in the row's E2E
+   column and wire it into `make end-to-end-test`. Extend `tool/test_scope.json`
+   with the selected implemented change; planned authoring alone does not
+   activate future tests. Keep supplemental real-device/field obligations.
 
 ## Verify
 
-Run formatting and targeted tests first, then all repository-required checks
-and coverage thresholds. Inspect the final diff for accidental edits, missing
-criteria, contract drift, and generated-file requirements. Fix failures caused
-by the change; report the exact command and evidence for unrelated failures.
+Run formatting and targeted checks first. Then run **both** `make unit-test`
+and `make end-to-end-test` against the final implementation, including all
+configured suites and every selected change case. Both must actually execute
+nonempty suites and pass, along with required coverage and other checks, before
+work can be considered finished. There is no documentation/infrastructure or
+"unrelated failure" exemption from these two completion gates. Continue
+implementing/fixing authorized code and tests until both pass; rerun affected
+checks after fixes, and rerun both final gates when their evidence is invalidated.
+Do not stop after adding tests, report a failed run as completion, weaken
+assertions, skip tests, shrink test scope, or mark required E2E N/A. Missing
+tools/devices are unmet gates to resolve, never passing placeholders. Inspect
+the final diff for accidental edits, missing cases, contract drift and generated
+files. Report an unavoidable external blocker honestly without claiming finish.
 
 For the selected change under `agent/changes/`, record the completed implementation
 in the repository-root `implementation-log.md`. The skill owns this write; do

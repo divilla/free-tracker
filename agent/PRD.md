@@ -1,5 +1,7 @@
 # free-tracker — Product Requirements Document
 
+> **Delivery verification policy (2026-10-31):** Each implemented change test-case row requires unit coverage and at least one distinct named E2E test executed by `make end-to-end-test`. Both complete Make suites must pass before implementation or findings fixes finish; continue authorized fixes until they do. Host CLI tests cover tooling and Android tests cover app behavior; physical-device/field requirements remain additional. This changes testing policy, not product scope.
+
 **Status:** Confirmed product scope; engineering proposals and deferred setup are explicitly identified. Implementation has not been performed as part of this document task.  
 **Product decisions recorded:** 2026-10-29–2026-10-30.  
 **PRD created/updated:** 2026-10-30.

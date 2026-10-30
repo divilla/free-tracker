@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "implemented_changes": [
+    "000-initial-commit",
+    "001-build-scaffold",
+    "002-setup-decisions",
+    "003-workflow-run-state"
+  ]
+}

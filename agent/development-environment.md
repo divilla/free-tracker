@@ -1,5 +1,7 @@
 # Local development environment
 
+> **Current completion policy (2026-10-31):** This record preserves dated evidence. Current implementation/findings-fix completion requires both complete Make suites to pass and a distinct executed E2E test for every implemented change-case row; see [IMPLEMENT §4](IMPLEMENT.md#4-verification-and-completion-gates). Historical N/A/not-run results below are not exemptions.
+
 **Verified:** 2026-10-30, 20:30 UTC, on the local Fedora 43 x86_64 host.
 **Scope:** environment recovery for S001, not app implementation or a delivery-gate pass.
 

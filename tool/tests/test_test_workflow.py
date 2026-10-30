@@ -169,7 +169,8 @@ class WorkflowTests(unittest.TestCase):
 
     def test_S001_T26_android_runner_executes_controlled_and_real_suites(self):
         result = self.run_workflow('e2e')
-        self.assertEqual(result['status'], 'passed'); self.assertEqual(len(result['suites']), 2)
+        self.assertEqual(result['status'], 'passed'); self.assertEqual(len(result['suites']), 3)
+        self.assertEqual({path for suite in result['suites'] for path in suite['counts']}, set(run_tests.E2E_PATHS))
         self.assertTrue(all('-d' in args and 'chosen' in args for args in self.calls if 'test' in args))
 
     def test_S001_T27_missing_or_wrong_android_environment_fails_unset(self):
