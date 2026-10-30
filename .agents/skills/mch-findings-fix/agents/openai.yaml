@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCH Findings Fix"
+  short_description: "Fix change-document or explicit code-review findings"
+  default_prompt: "Use $mch-findings-fix to validate and fix these change-document review findings without implementing code:"

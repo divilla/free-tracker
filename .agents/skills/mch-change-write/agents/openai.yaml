@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCH Change Write"
+  short_description: "Write a change document for the current change branch"
+  default_prompt: "Use $mch-change-write to extract the slug from the current change branch, write agent/changes/<slug>.md, and record its authoring completion."

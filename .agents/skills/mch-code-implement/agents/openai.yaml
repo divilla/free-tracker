@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCH Code Implement"
+  short_description: "Implement the current branch's change"
+  default_prompt: "Use $mch-code-implement to implement the current branch's change completely and verify the result."
