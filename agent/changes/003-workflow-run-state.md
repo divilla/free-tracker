@@ -1,5 +1,54 @@
 # S003 — Durable workflow preparation and run-state recovery
 
+> **Applied bootstrap correction (not full S003 completion):** The publisher
+> requested removal of predecessor review-history/handoff gates during this
+> branch. Baseline: branch `change/003-workflow-run-state`, HEAD
+> `ebc6c5dfaf7e43d07c0a9fac8a0ca8107f3322e7`, local `dev`
+> `f9f8273b4ed76f00285dcd9b586b534c904d6bda`; no baseline switch or remote
+> mutation. The legacy helpers now retain diagnostic observations and reject
+> blocked implementation outcomes. This focused repair does not implement the
+> preparation/locking/resume/projection requirements below or pass GW.
+
+| Bootstrap repair ID | Behavior | Identifiable unit tests | Real-Git workflow checks |
+| --- | --- | --- | --- |
+| WF-EVIDENCE-R01 | Git integration and required contents determine downstream readiness; no predecessor review-receipt, caller-confirmation or handoff gate | `scripts/test-workflow-evidence.pl`: `WF-EVIDENCE-R01` subtests (missing records, integration without review records, stale handoff) | `scripts/test-codex-flow-run.sh`: `WF-EVIDENCE-R01` next complete workflow with archived predecessor receipts and unchanged historical note |
+| WF-EVIDENCE-R02 | Preserve immutable commit-bound observations privately across cleanup, squash and linked worktrees | `scripts/test-workflow-evidence.pl`: `WF-EVIDENCE-R02` subtests | `scripts/test-codex-flow-run.sh`: `WF-EVIDENCE-R02` retained code review mapped to verified squash |
+| WF-EVIDENCE-R03 | Explicit implementation outcome; zero-exit blocked/invalid model result cannot commit or continue | `scripts/test-workflow-evidence.pl`: `WF-EVIDENCE-R03` outcome validation | `scripts/test-codex-code-implement.sh`: blocked partial edit and missing outcome retain HEAD, return nonzero, no green completion |
+| WF-EVIDENCE-R04 | Malformed, partial, failed or stale diagnostic observations cannot fabricate passing results; review diagnostics never undo integration | `scripts/test-workflow-evidence.pl`: both `WF-EVIDENCE-R04` subtests | `make workflow-test`: existing review/merge failure and direct merge recovery regressions |
+
+Bootstrap validation: `make workflow-test`, `make unit-test`, skill frontmatter
+validation and `git diff --check`. App E2E/device/SQLite checks are N/A for this
+repair: no app/UI/storage/platform behavior changes. Retain their existing gates;
+these tooling tests cannot substitute for them. Application/domain coverage policy
+is unchanged; Perl infrastructure uses mapped observable/error/real-Git tests,
+without claiming unmeasured Perl branch/line coverage. The observation contract
+is documented in IMPLEMENT §5 and scripts/README; no additional handoff is used.
+
+**Bootstrap repair verification, 2026-10-30 22:35 UTC:** At the HEAD/dev commits
+above plus this uncommitted repair, `make workflow-test` exited 0 on the host
+(unit, real temporary-Git workflow, review/fix, merge/recovery, promotion,
+release initialization, authentication, branch creation and plan-run checks).
+After the final diagnostic-error handling update, `perl
+scripts/test-workflow-evidence.pl` passed all 9 named subtests and `bash
+scripts/test-codex-flow-run.sh` passed again, including the next-change regression.
+`make unit-test` exited 0 on the host: 71 Python, 32 core and 53 Flutter tests;
+Dart line coverage 103/103, branch coverage unavailable. Final
+`python3 tool/check_scaffold.py`, all 71 `tool/tests` tests, both edited skills'
+`quick_validate.py` checks, and `git diff --check` passed. The sorted
+`scripts/`, both edited skill directories and root Makefile inventory (filename,
+NUL, bytes, NUL per file; tracked plus nonignored untracked) has SHA-256
+`e7dd103ade864a0cad88bf913527d3c4e2d9f4a432999b198dc50b9f497d7e23`.
+The app runner's separate source SHA-256 is
+`59962427670026d8393c02845b7b3bebf0a1f9daec4b3dc3cd71aa3196dd50d3`.
+Initial sandbox runs failed at the read-only Flutter SDK cache and prohibited
+isolated SSH-agent socket respectively; approved host retries passed. No real
+remote was refreshed/mutated, no app E2E/device/SQLite run is claimed, and nothing
+was committed/pushed. Local replaceable logs are
+`/tmp/free-tracker-cleaner-workflow-tests-host.txt`,
+`/tmp/free-tracker-cleaner-unit-tests-host.txt`,
+`/tmp/free-tracker-cleaner-evidence-tests.txt` and
+`/tmp/free-tracker-cleaner-flow-tests.txt`; this paragraph retains the summary.
+
 | Metadata | Value |
 | --- | --- |
 | Change ID | `S003` |
@@ -13,7 +62,7 @@
 
 Provide a script-owned, durable and fail-closed **preparation** boundary for one planned change: validate identity/prerequisites, select an exact baseline, create an isolated worktree without disturbing user work, serialize ownership and reconcile interrupted preparation. Successful preparation is not successful implementation, review, merge or product validation. S004 consumes this boundary and owns the later execution loop.
 
-The clean authoring baseline contains S001 app/tests and S002 setup/checker/tests. S002 reports earlier passing checks, followed by F01/F02 tooling passes but failed full `make unit-test` at the read-only Flutter SDK cache and failed remote verification. Those scoped historical results remain historical. Git source presence and the local squash-looking commit do not prove independent review or the verified merge procedure. The publisher's authoring clarification resolves the stale PLAN baseline, not those gates.
+The clean authoring baseline contains S001 app/tests and S002 setup/checker/tests. S002 reports earlier passing checks, followed by F01/F02 tooling passes but failed full `make unit-test` at the read-only Flutter SDK cache and failed remote verification. Those scoped historical results remain historical; verify current applicable prerequisites rather than treating a dated failure as permanent. Git integration does not prove required behavior; inspect actual source/contracts/tests. Review/fix enforcement belongs to each change's own delivery workflow, not to subsequent changes. S003 must not re-audit S001/S002 review history or require their historical receipts/caller confirmation. See [PLAN's bootstrap reconciliation](../PLAN.md#progress-ledger) and IMPLEMENT §2. An old handoff's delivery status is not a second gate. Concrete required source/test/tool evidence still must be verified. No GW/device/release completion is implied.
 
 ### Existing automation audit and reuse boundary
 

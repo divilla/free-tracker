@@ -56,11 +56,23 @@ Do not commit or push; the caller handles commits.
 5. Before implementation edits, verify the selected change's direct and
    transitive dependencies, applicable PLAN gates/decisions, and IMPLEMENT
    readiness against current code and recorded evidence at the exact `dev`
-   baseline supplied or verified by the caller. A predecessor document, authored
-   status, branch or merge alone does not prove the consumer's required code,
-   tests or device evidence exists. Missing, stale or contradictory prerequisite
-   evidence blocks dependent work: report the specific dependency, evidence and
-   next action without editing or claiming readiness. Do not refresh/switch the
+   baseline supplied or verified by the caller. Use Git to establish dependency
+   integration: an exact `Implement change <slug>` commit reachable from that
+   baseline identifies the integrated change; inspect its actual code/contracts
+   for what the consumer needs. A commit message alone does not prove those
+   contents or product/device validation. Review/fix enforcement belongs to the
+   workflow delivering each change, not to subsequent changes: do not re-audit
+   a predecessor's review/fix history or require its review receipts, delivery
+   confirmation, or a synchronized handoff before starting dependent work.
+   Handoffs and aggregate PLAN prose are dated context, not a second delivery
+   gate. When useful, `perl scripts/workflow-evidence.pl <dependency-slug>
+   <exact-dev-commit>` reports Git integration and optional diagnostic receipts;
+   unknown historical review/check statuses are not dependency blockers.
+   Verify the current stage's concrete code/test/tool/device prerequisites;
+   prior administrative delivery records are not additional prerequisites. Missing,
+   failed or contradictory evidence for an actual prerequisite blocks dependent
+   work: identify the requirement, evidence, owner and next action, not merely
+   an old status sentence or an absent legacy receipt. Do not refresh/switch the
    baseline silently or advance script-owned gates.
    Distinguish prerequisites from outputs this change must produce: do not
    require its own implementation/tests/device results before starting. Apply
@@ -110,3 +122,10 @@ files as zero lines.
 Declare completion only when every criterion is implemented and tested,
 contracts remain aligned, and required checks pass. Summarize the behavior,
 verification, and any remaining limitation with links to key files.
+
+When the caller sets `MCH_IMPLEMENTATION_OUTCOME_FILE`, write a JSON object there
+before returning, including when blocked before edits:
+`{"schema":1,"outcome":"complete|blocked|failed"}` (select one outcome).
+Use `complete` only after the completion conditions above are satisfied. This
+private caller-owned result is separate from the prose response and tracked
+files; do not commit it. Missing/malformed outcomes fail closed in the runner.

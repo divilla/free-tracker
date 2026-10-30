@@ -15,6 +15,7 @@ use lib "$FindBin::Bin/lib";
 use mch::Progress;
 use mch::CodexSession qw(report_session_id);
 use mch::GitAuth qw(require_git_auth);
+use mch::WorkflowEvidence qw(git_value save_receipt implementation_outcome);
 
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
@@ -23,6 +24,8 @@ my $active_codex_pid;
 my $temporary_dir;
 my $active_output_log;
 my $result_file;
+my $outcome_file;
+my $evidence_context;
 my $requested_exit_code = 0;
 
 sub fail {
@@ -224,8 +227,21 @@ sub run_codex {
 	my $progress = mch::Progress->new(terminal => -t STDOUT, output => \*STDOUT);
 	$active_output_log = File::Spec->catfile($temporary_dir, 'codex-output.log');
 	my $exit_code = monitor_command($progress, $active_output_log, @command);
-	$progress->finish($exit_code == 0 && $requested_exit_code == 0);
+	my $outcome = implementation_outcome($outcome_file);
+	$progress->finish($exit_code == 0 && $requested_exit_code == 0 && $outcome eq 'complete');
 	report_session_id(read_file($active_output_log));
+	my %reports;
+	for my $mode ('unit', 'e2e') {
+		my $path = "build/test-results/$mode/summary.json";
+		$reports{$mode} = read_file($path) if -f $path;
+	}
+	save_receipt($evidence_context->{slug}, {
+		%$evidence_context, phase => 'implementation-attempt',
+		outcome => $exit_code || $requested_exit_code ? 'failed' : $outcome,
+		exit_code => $exit_code, interrupted => $requested_exit_code,
+		response => -f $result_file ? read_file($result_file) : '',
+		check_reports => \%reports,
+	});
 	if ($requested_exit_code != 0) {
 		unlink $active_output_log;
 		$active_output_log = undef;
@@ -275,6 +291,7 @@ sub ensure_clean_worktree {
 sub cleanup {
 	unlink $active_output_log if defined $active_output_log && -e $active_output_log;
 	unlink $result_file if defined $result_file && -e $result_file;
+	unlink $outcome_file if defined $outcome_file && -e $outcome_file;
 	rmdir $temporary_dir if defined $temporary_dir && -d $temporary_dir;
 }
 
@@ -311,6 +328,10 @@ sub main {
 	$temporary_dir = tempdir('apih-implement.XXXXXXXXXX', DIR => $temp_root, CLEANUP => 0);
 	defined $temporary_dir or fail("cannot create private implementation directory under $temp_root");
 	$result_file = File::Spec->catfile($temporary_dir, 'implementation-result.md');
+	$outcome_file = File::Spec->catfile($temporary_dir, 'implementation-outcome.json');
+	local $ENV{MCH_IMPLEMENTATION_OUTCOME_FILE} = $outcome_file;
+	$evidence_context = { slug => $change_name, branch => $branch, source => $before_implementation };
+	save_receipt($change_name, { %$evidence_context, phase => 'implementation-attempt', outcome => 'started' });
 
 	print_initial_context({
 		branch        => $branch,
@@ -328,6 +349,8 @@ sub main {
 	exit $status if $status != 0;
 	-f $result_file or fail('implementation did not write a final response');
 	print_file_block($result_file);
+	my $outcome = implementation_outcome($outcome_file);
+	$outcome eq 'complete' or fail("implementation outcome is $outcome; refusing to commit or continue");
 
 	my ($after_implementation, $after_status) = capture_command(0, 'git', 'rev-parse', 'HEAD');
 	$after_status == 0 or exit $after_status;
@@ -350,6 +373,8 @@ sub main {
 	run_checked('git', 'commit', '-m', $commit_message);
 	run_checked('git', 'push', '-u', 'origin', $branch);
 	ensure_clean_worktree();
+	save_receipt($change_name, { %$evidence_context, phase => 'implementation', outcome => 'committed',
+		source => git_value(qw(rev-parse HEAD)), tree => git_value(qw(rev-parse HEAD^{tree})) });
 	return 0;
 }
 

@@ -1,12 +1,12 @@
 # free-tracker — Scripted implementation workflow
 
-**Status:** Execution contract adopted; automation scripts are not yet implemented.
+**Status:** Execution contract adopted; legacy helpers and observation receipts are present, but S003–S004/GW conformance is not yet established.
 
 ## 1. Purpose and ownership
 
 [PLAN.md](PLAN.md) drives delivery of the entire app through bounded, dependency-ordered changes in `agent/changes/`. This document defines how each change is implemented, verified, reviewed, and merged.
 
-Repository scripts in `scripts/` must execute the workflow: branch/worktree setup, code implementation, checks, commits, PR-style reviews, fixes, and squash-merge into `dev`. Scripts may invoke coding/review agents and development tools; the scripts own sequencing, durable state, and gate enforcement. Agent prose alone must not advance a gate. Script entry points and usage will be documented when implemented; this document does not claim that any command already exists.
+Repository scripts in `scripts/` must execute the workflow: branch/worktree setup, code implementation, checks, commits, PR-style reviews, fixes, and squash-merge into `dev`. Scripts may invoke coding/review agents and development tools; the scripts own sequencing, durable state, and gate enforcement. Agent prose alone must not advance a machine-verified gate. Existing entry points are documented in [scripts/README.md](../scripts/README.md); their presence does not establish full workflow conformance.
 
 The governing inputs are:
 
@@ -21,6 +21,19 @@ Changes and scripts must not silently override these inputs or convert unresolve
 ## 2. Change readiness and size
 
 Before implementation, each change must identify its stable ID, unique numbered slug (`001-build-scaffold`, for example), scope/non-goals, dependencies, linked product requirements, interfaces, acceptance scenarios, failure/recovery behavior, and validation commands. Give requirements and test cases stable IDs and map them to identifiable tests as required by `AGENTS.md`.
+
+Dependency readiness uses current code/contracts and evidence required by the
+consumer's stage. Git establishes integration: an exact `Implement change <slug>`
+commit reachable from the selected `dev` baseline identifies the integrated
+change; inspect actual code/contracts as well. A title alone is not proof of
+required behavior. Review/fix enforcement belongs to the workflow delivering
+each change, not its consumers. Subsequent changes must not re-audit predecessor
+review/fix history or require historical review receipts, publisher confirmation,
+or synchronized handoffs. Historical notes and aggregate PLAN status are context,
+not a separate delivery gate. An implementation-time `not run` entry must not
+veto integrated code. Actual missing/failed stage
+prerequisites still block. Later device/release obligations remain assigned to
+their owning gates, not automatically promoted or applied to unrelated tooling.
 
 The change document is `agent/changes/<slug>.md` and its branch is `change/<slug>`; `<slug>` includes the number and descriptive name unchanged. S001 (`001-build-scaffold`) establishes executable reference code, not just a directory layout. Later application changes must identify the reference files/patterns they extend and document any justified architectural deviation in ARCHITECTURE.
 
@@ -94,6 +107,33 @@ Documentation-only and infrastructure-only changes must state which checks apply
 A merged change is not automatically a completed product requirement. Mark a requirement complete only when all its implementation and validation obligations are satisfied. Whole-app completion additionally requires the PRD acceptance and release gates; a set of clean reviews is insufficient.
 
 ## 5. Script reliability and execution records
+
+### Legacy observation receipts (bootstrap correction)
+
+The legacy implementation/review/merge helpers retain immutable schema-1 JSON
+observations under the common Git directory's `mch-workflow-evidence/<slug>/`.
+These are diagnostics, not a competing run ledger, automatic dependency approval,
+or proof of GW. S003/S004 must reuse/import these observations rather than
+discarding their history when implementing authoritative state/projections.
+`perl scripts/workflow-evidence.pl <slug> <dev-commit-or-ref>` is read-only: it
+reports integration from exact change commits reachable in Git, independently
+of receipts. Optional merge observations are checked against Git tree/parent;
+diagnostic code review is verified only when the latest code-review observation
+is clean and its exact baseline and reviewed tree match that integration. Failed,
+incomplete, missing or stale observations never become passing outcomes and do
+not undo Git integration. Diagnostic review status is not a downstream dependency
+gate. Document review cannot substitute for code review. Diagnostic errors are
+reported separately and never veto Git integration. Check summaries are retained as reported
+artifacts (including their revision/content digest), not blindly certified
+because a model says implementation is complete. Consumers still verify the
+applicable commands, scope, revisions/content and outcomes.
+
+Implementation uses a private `MCH_IMPLEMENTATION_OUTCOME_FILE` JSON object
+with `schema: 1` and `outcome: complete|blocked|failed`. Missing/invalid/noncomplete
+outcomes stop nonzero before commit/review/merge, even when Codex itself exits 0;
+the progress indicator must not present that blocked attempt as successful.
+These additions do not retrofit the legacy merge procedure into compliance with
+the serialization/final-source/retry contracts below.
 
 When added, the scripts must:
 

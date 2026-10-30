@@ -82,9 +82,14 @@ or conflicts with a protected contract, report the blocker rather than guessing.
 
 Before code edits, verify direct/transitive dependencies and applicable
 PLAN/IMPLEMENT prerequisites against the current code, evidence and exact `dev`
-baseline. A document, authored status, branch or merge alone is not dependency
-evidence. Stop without code edits and report missing, stale or contradictory
-prerequisite evidence or document/PLAN contract drift. Use PLAN §7's bootstrap
+baseline. Inspect actual code/contracts and this stage's required test/device
+evidence; a document or commit title alone does not prove required behavior.
+Use Git for predecessor integration, not historical handoff status. Review/fix
+enforcement belongs to each change's delivering workflow: do not re-audit
+predecessor reviews or require their historical receipts/caller confirmation.
+Stop without code edits for genuinely missing, failed or contradictory stage
+prerequisites or document/PLAN contract drift, not merely old delivery notes.
+Use PLAN §7's bootstrap
 rules where applicable; do not demand this change's own future completion
 evidence as a prerequisite or let review fixes bypass script-owned gates.
 

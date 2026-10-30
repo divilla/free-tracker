@@ -1,9 +1,9 @@
 # free-tracker — Whole-app execution plan
 
-**Status:** Whole-app roadmap and S001–S003 change documents authored; other inventory documents remain pending. S001 code and historical check evidence, plus S002 setup/tooling and scoped check evidence, are present on local `dev`. S002's latest full-unit and remote-freshness checks remain unmet; separate workflow delivery gates remain unverified. S003 implementation and other work remain planned.
+**Status:** Whole-app roadmap and S001–S003 change documents authored; other inventory documents remain pending. S001 code and S002 setup/tooling are integrated on local `dev`. Their dated handoff checks are historical, not current dependency delivery gates; see the bootstrap reconciliation in §8. S003's full preparation/recovery implementation remains planned; the focused dependency-policy/diagnostic-observation repair is recorded in its change document.
 
 **Updated:** 2026-10-30.  
-**Next action:** S002's [setup handoff](setup-decisions.md) carries forward the S001 identity/stack and inventories remaining prerequisites, with local consistency tests. Preserve separate review/workflow delivery gates; S003 must audit existing scripts before trusting them. Revalidate physical, account, source and release evidence before their owning consumers.
+**Next action:** S003 consumes the integrated S001/S002 code/contracts, not their review histories, and must audit existing scripts before trusting them. S002's [setup notes](setup-decisions.md) retain identity/stack and resource context. Revalidate concrete physical, account, source and release evidence before their owning consumers; do not reopen predecessor administrative delivery gates.
 
 ## 1. Purpose, authority, and baseline
 
@@ -248,7 +248,21 @@ Remote pushing/hosted PR creation is not implicit; scripts must configure it exp
 
 ### Progress ledger
 
-The inventory remains the initial workflow ledger; authoring does not advance its implementation/check/review/merge/requirement-validation fields. **S001 code is present on local `dev` at `cb54712`, with historical [passing implementation/check evidence](s001-evidence.md); separate review/verified-merge and later device/release gates remain unverified.** Make targets run real suites, not unavailable placeholders. This reconciliation records the publisher-approved baseline without inventing workflow completion or fresh execution results. Future scripts must maintain machine-readable records under `agent/progress/` (schema/entry points owned by S003–S004) and link concise summaries here. Keep raw sensor data, large logs and secrets outside automatic staging; record stable artifact locations/integrity identifiers as appropriate.
+**Bootstrap reconciliation (publisher instruction, 2026-10-30):** The publisher
+confirmed in this session that S002 review, commit and merge all ran successfully.
+Local `dev` contains S002 `f9f8273b4ed76f00285dcd9b586b534c904d6bda`, whose parent
+is S001 `cb54712a73847cd2d1f2d6bf5437782c975317d4`. This is caller-confirmed
+legacy delivery plus Git integration, not newly recovered machine review logs.
+Older handoff/aggregate `not run` and `unverified` entries below describe their
+recording stage, not a current veto on S003. The publisher additionally clarified
+that later changes must not re-audit predecessor review/fix history: delivery
+enforcement belongs to the workflow delivering that change. S001 code/tests and
+S002 contracts must still satisfy S003's concrete prerequisites. Use IMPLEMENT
+§2's policy; no review receipt, caller confirmation, replacement handoff or repeat
+merge is required as a downstream prerequisite. This correction
+does not complete GW, physical-device, field or release gates.
+
+The inventory remains the initial workflow ledger; authoring does not advance its implementation/check/review/merge/requirement-validation fields. **Historical snapshot:** S001 code was present on local `dev` at `cb54712`, with historical [passing implementation/check evidence](s001-evidence.md); separate review/verified-merge records were unverified at that recording stage. Later device/release gates remain unverified. See the bootstrap reconciliation above for subsequent delivery context. Make targets run real suites, not unavailable placeholders. Future scripts must maintain machine-readable records under `agent/progress/` (schema/entry points owned by S003–S004) and link concise summaries here. Keep raw sensor data, large logs and secrets outside automatic staging; record stable artifact locations/integrity identifiers as appropriate.
 
 | Per-change field | Meaning / initial state |
 | --- | --- |

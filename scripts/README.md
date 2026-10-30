@@ -400,6 +400,56 @@ nonzero exits. Temporary results and logs are cleaned on exit.
 
 ## `codex-code-implement.pl`
 
+### Dependency readiness and retained workflow observations
+
+Dependency readiness is integration plus the code/contracts and validation
+needed by the current stage. **Subsequent changes do not re-audit predecessor
+review/fix history.** Each change's own delivering workflow enforces its review
+loop. Find the exact `Implement change <slug>` commit reachable from the selected
+`dev` baseline and inspect required contents. A subject line alone is not proof
+of required behavior or device/product validation. Old handoff `not run` notes
+and missing historical receipts are not additional downstream delivery gates;
+no replacement handoff or publisher confirmation is required.
+
+Read-only optional diagnostics, from the repository/worktree:
+
+```shell
+perl scripts/workflow-evidence.pl 002-setup-decisions dev
+```
+
+The JSON reports the exact resolved baseline, `integration` (`verified`,
+`unverified`, or `ambiguous` if multiple exact change commits exist), optional
+review diagnostics, and retained receipts. Exit 0 means inspection succeeded,
+not that all delivery/product gates passed. Git integration is independent of
+review receipts. A clean diagnostic code review requires the latest code-review
+receipt to match the squash tree and parent baseline; document review never
+substitutes for code review. Unknown/stale/failed review diagnostics do not undo
+integration or become downstream prerequisites. Missing required code/contracts
+or current-stage validation still block, with a concrete requirement/reason.
+
+The implementation/review/merge helpers now append private schema-1 JSON
+observations beneath `git rev-parse --git-common-dir`, in
+`mch-workflow-evidence/<slug>/<unique-observation>/receipt.json`. They retain
+responses, exact source/tree/baseline where applicable, review mode/pass/outcome,
+implementation command outcome and any available app check-summary contents,
+and the verified published merge SHA. Check reports retain their own revision
+and dirty-content digest; presence/model prose does not certify them. Inspect
+scope and content identity before using a report as check evidence. Temporary
+output can be removed without losing these observations. They remain local,
+are shared across linked worktrees, are not automatically staged/pushed, and
+must be explicitly archived for portability. Missing observations for older
+runs need no backfill. Interrupted observations stay incomplete; malformed or
+conflicting receipts produce explicit diagnostic errors and unverified review
+status, without overriding Git integration or inventing passing observations.
+
+These receipts are diagnostics, not S003's authoritative run-state/projection
+schema or a claim of GW conformance. S003/S004 must reuse/import their evidence.
+No new lock/retry/unattended-merge guarantees are implied.
+
+Run the mapped unit and real-Git regressions with `make workflow-test`. They
+use deterministic Codex adapters and temporary local remotes; no real Codex,
+publisher remote or device is used.
+
 Implement the current branch's already-authored change:
 
 ```shell
@@ -440,11 +490,17 @@ derived from the branch for validation and context display, not passed to the
 skill.
 The command has the same elapsed-time, output-marker, activity-marker, success, failure, and
 interrupt behavior as `codex-review-loop.pl`. Raw JSON output is suppressed on
-success and printed on failure. When Codex succeeds, the script requires both a
-final response and repository changes. It prints the final response between the
+success and printed on failure. The caller sets a private
+`MCH_IMPLEMENTATION_OUTCOME_FILE`; the skill must write
+`{"schema":1,"outcome":"complete"}`, or `blocked`/`failed` as appropriate.
+Missing, malformed, blocked or failed outcomes stop nonzero before any commit or
+subsequent workflow phase, even if Codex exits 0 or leaves partial edits. The
+implementation progress line shows failure for those attempts. No prose parsing
+or green process exit substitutes for an explicit completed outcome. On complete,
+the script also requires a final response and repository changes. It prints the final response between the
 progress line and the changed-file list, then commits and pushes the changes as
 `Implement code <slug>`. Temporary output stays outside the repository
-and is removed on exit.
+and is removed on exit after retaining the observation receipt.
 
 ## `codex-review-loop.pl`
 

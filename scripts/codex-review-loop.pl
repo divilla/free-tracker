@@ -15,6 +15,7 @@ use lib "$FindBin::Bin/lib";
 use mch::Progress;
 use mch::CodexSession qw(report_session_id);
 use mch::GitAuth qw(require_git_auth);
+use mch::WorkflowEvidence qw(git_value save_receipt);
 
 STDOUT->autoflush(1);
 STDERR->autoflush(1);
@@ -433,10 +434,25 @@ sub main {
 	my $fix_number = 1;
 	while (1) {
 		printf "\n=== Review pass %02d ===\n", $pass;
+		my ($slug) = $branch =~ m{^change/(.+)$};
+		my $source = git_value(qw(rev-parse HEAD));
+		my $tree = git_value(qw(rev-parse HEAD^{tree}));
+		my $evidence = { phase => 'review', mode => $mode, branch => $branch,
+			source => $source, tree => $tree, baseline => $review_base_commit, pass => $pass };
+		save_receipt($slug, { %$evidence, outcome => 'started' });
 		unlink $findings_file;
 		my @review_command = ('codex', 'exec', 'review', '--json', @review_arguments, '-o', $findings_file);
 		$status = run_codex(undef, @review_command);
+		my $displayable = -f $findings_file && review_is_displayable($findings_file);
+		my $unchanged = git_value(qw(rev-parse HEAD)) eq $source
+			&& git_value(qw(branch --show-current)) eq $branch
+			&& git_value(qw(status --porcelain=v1 --untracked-files=all --ignore-submodules=none)) eq '';
+		my $outcome = $status || !$displayable || !$unchanged ? 'failed'
+			: review_has_findings($findings_file) ? 'findings' : 'clean';
+		save_receipt($slug, { %$evidence, outcome => $outcome, exit_code => $status,
+			response => -f $findings_file ? read_file($findings_file) : '' });
 		exit $status if $status != 0;
+		$unchanged or fail('review changed the source, branch or worktree; evidence is invalid');
 		-f $findings_file or fail('review did not write findings.md');
 
 		print_file_block($findings_file);

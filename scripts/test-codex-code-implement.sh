@@ -18,6 +18,7 @@ trap cleanup EXIT
 cp "$script_dir/codex-code-implement.pl" "$repo/scripts/codex-code-implement.pl"
 cp "$script_dir/lib/mch/Progress.pm" "$repo/scripts/lib/mch/Progress.pm"
 cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
+cp "$script_dir/lib/mch/WorkflowEvidence.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/lib/mch/GitAuth.pm" "$repo/scripts/lib/mch/GitAuth.pm"
 cp "$script_dir/git-auth.sh" "$repo/scripts/git-auth.sh"
 cp "$script_dir/test-lib/ssh-add" "$fake_bin/ssh-add"
@@ -52,6 +53,17 @@ if [[ ${CODEX_TEST_FAIL-} == 1 ]]; then
 	printf '%s\n' 'simulated implementation failure' >&2
 	exit 42
 fi
+if [[ ${CODEX_TEST_BLOCKED-} == 1 ]]; then
+	printf '%s\n' '{"schema":1,"outcome":"blocked"}' >"$MCH_IMPLEMENTATION_OUTCOME_FILE"
+	printf '%s\n' 'Implementation blocked: required checks failed.' >"$result"
+	# A partial edit must never be auto-committed after a blocked outcome.
+	printf '%s\n' 'partial work' >partial.txt
+	exit 0
+fi
+if [[ ${CODEX_TEST_NO_OUTCOME-} == 1 ]]; then
+	printf '%s\n' 'Completed prose without a structured outcome.' >"$result"
+	exit 0
+fi
 
 [[ "$prompt" == '$mch-code-implement' ]]
 count=0
@@ -61,6 +73,7 @@ printf '%s\n' "$count" >"$CODEX_TEST_IMPLEMENTATION_COUNT"
 sleep 1.1
 printf '%s\n' '{"type":"completed"}'
 printf '%s\n' 'Implementation complete.' >"$result"
+printf '%s\n' '{"schema":1,"outcome":"complete"}' >"$MCH_IMPLEMENTATION_OUTCOME_FILE"
 printf '%s\n' "$count" >"implemented-$count.txt"
 printf '%s\n' 'new production' >production.go
 printf '%s\n' 'new test one' 'new test two' >production_test.go
@@ -213,3 +226,24 @@ set -e
 grep -Fxq 'codex-code-implement: usage: codex-code-implement.pl' "$invalid_error"
 
 printf '%s\n' 'codex-code-implement tests passed'
+
+# WF-EVIDENCE-R03: a zero-exit blocked/invalid response cannot continue delivery.
+git -C "$repo" checkout -q change/001-failing-change
+before_blocked=$(git -C "$repo" rev-parse HEAD)
+for outcome in blocked missing; do
+	status=0
+	blocked_flag=0
+	missing_flag=0
+	if [[ $outcome == blocked ]]; then blocked_flag=1; else missing_flag=1; fi
+	(
+		cd "$repo"
+		PATH="$fake_bin:$PATH" CODEX_TEST_BLOCKED=$blocked_flag \
+			CODEX_TEST_NO_OUTCOME=$missing_flag \
+			./scripts/codex-code-implement.pl
+	) >"$test_root/outcome-output" 2>"$test_root/outcome-error" || status=$?
+	[[ $status -eq 1 && $(git -C "$repo" rev-parse HEAD) == "$before_blocked" ]]
+	! grep -Fq '[✅]' "$test_root/outcome-output"
+	grep -Fq 'refusing to commit or continue' "$test_root/outcome-error"
+	rm -f -- "$repo/partial.txt"
+done
+printf '%s\n' 'WF-EVIDENCE-R03 blocked and absent outcomes fail without commit/push'

@@ -186,6 +186,14 @@ remains historical. No new external claim is asserted verified here.
 
 ## Checks and handoff
 
+This is dated implementation-stage evidence, not the current delivery ledger.
+The review/merge row below was written before the caller's subsequent workflow.
+See [PLAN bootstrap reconciliation](PLAN.md#progress-ledger) for the publisher's
+confirmation and Git integration. Keep this historical row intact; do not use it
+as a veto on later delivery evidence or require this handoff to be synchronized
+after every merge. Resource/support/physical/release obligations remain scoped
+to their actual consumers.
+
 | Check | State | Command / procedure | Result | Observed UTC | Source / scope | Environment | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | S001 baseline | recorded historical | Inspect source inventory and portable S001 summary | Historical: S001 analysis/build/unit/E01–E10/P01 passed on its identified content; not rerun as S002 | 2026-10-30 21:38 UTC | revision cb54712a73847cd2d1f2d6bf5437782c975317d4; scope: S001 source handoff, SHA-256 066ceba6b64a239f9e427510c3d335860b9b935bf9911d902fa6bcbd682526b5 | Fedora 43; API 37 x86_64 emulator | [portable evidence](s001-evidence.md) |
