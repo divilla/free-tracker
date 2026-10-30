@@ -56,6 +56,13 @@ S002 carries identity/stack/setup evidence forward. S005 extends these runners
 and project with real SQLite transactions/recovery/migrations; do not regenerate
 a competing app. S019 extends the same app-information presentation.
 
+S002's [setup handoff](setup-decisions.md) now records the carried-forward stack,
+resource inventory and remaining decision/map/release blockers. The existing
+contract guard also validates its eight-section handoff against local sources;
+`make unit-test` discovers mapped S002 T01–T20 alongside the unchanged S001 cases.
+A complete unknown/partial inventory can validate without establishing missing
+phone/account facts, current provider policy, independent review or delivery gates.
+
 ## Verification and evidence
 
 Before generation: `python3 tool/check_scaffold.py --pre-generation --application-id com.bindefined.freetracker`.

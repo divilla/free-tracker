@@ -20,3 +20,6 @@ coverage. Android E2E includes controlled failure/recovery and real metadata.
 SQLite is not yet introduced; S005/S009 must add real-database integration checks.
 See [extension/setup guide](agent/reference-scaffold.md) and
 [execution evidence](agent/s001-evidence.md) for commands, versions and limits.
+The [setup handoff](agent/setup-decisions.md) records remaining phone, account,
+map and release prerequisites. `python3 tool/check_scaffold.py` checks its local
+consistency read-only; a pass does not verify unknown external facts.
