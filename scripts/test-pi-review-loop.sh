@@ -125,13 +125,19 @@ fi
 if [[ ${PI_TEST_OMIT_FINAL_RESPONSE-} == 1 ]]; then
 	exit 0
 fi
+if [[ ${PI_TEST_INCOMPLETE_STOP-} == 1 ]]; then
+	# Pi exited zero after an error response, having already made partial edits.
+	printf '%s\n' 'Partially applied fix.' >>agent/changes/001-test-change.md
+	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error"}}'
+	exit 0
+fi
 if [[ "$prompt" == *' --code' ]]; then
 	printf '%s\n' 'fixed code' >reviewed.txt
 else
 	printf '%s\n' 'Fixed acceptance criterion.' >>agent/changes/001-test-change.md
 	printf '%s\n' 'Selected change authoring corrected; implementation pending.' >>agent/PLAN.md
 fi
-printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Applied all valid review findings.\n"}]}}'
+printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Applied all valid review findings.\n"}],"stopReason":"stop"}}'
 EOF
 chmod +x "$fake_bin/pi"
 
@@ -227,6 +233,34 @@ grep -Fxq 'pi-review-loop: Pi did not emit a final assistant response' "$missing
 [[ -z $(git -C "$repo" status --short) ]]
 missing_findings_file=$(sed -n 's/^Findings: //p' "$missing_output" | head -n 1)
 [[ ! -e "${missing_findings_file%/*}" ]]
+
+incomplete_output="$test_root/incomplete-stop-output"
+incomplete_error="$test_root/incomplete-stop-error"
+incomplete_captured_findings="$test_root/incomplete-stop-captured-findings.md"
+set +e
+(
+	cd "$repo"
+	PATH="$fake_bin:$PATH" \
+		CODEX_TEST_REVIEW_RESULT="$findings_fixture" \
+		CODEX_TEST_EXPECTED_BASE="$pinned_base" \
+		PI_TEST_EXPECTED_PROMPT='$mch-findings-fix' \
+		PI_TEST_CAPTURED_FINDINGS="$incomplete_captured_findings" \
+		PI_TEST_INCOMPLETE_STOP=1 \
+		./scripts/pi-review-loop.pl --base origin/dev
+) >"$incomplete_output" 2>"$incomplete_error"
+incomplete_status=$?
+set -e
+[[ $incomplete_status -eq 1 ]]
+grep -Fxq 'Pi session ID: fix-session.01' "$incomplete_output"
+grep -Fxq "pi-review-loop: Pi final assistant response ended with stopReason 'error', not 'stop'" "$incomplete_error"
+[[ $(git -C "$repo" rev-parse HEAD) == "$head_before" ]]
+[[ $(git -C "$repo" rev-parse "origin/$branch") == "$head_before" ]]
+grep -Fq 'Partially applied fix.' "$repo/$change"
+[[ -n $(git -C "$repo" status --short) ]]
+incomplete_findings_file=$(sed -n 's/^Findings: //p' "$incomplete_output" | head -n 1)
+[[ ! -e "${incomplete_findings_file%/*}" ]]
+git -C "$repo" checkout -q -- .
+[[ -z $(git -C "$repo" status --short) ]]
 
 code_output="$test_root/code-output"
 code_captured_findings="$test_root/code-captured-findings.md"

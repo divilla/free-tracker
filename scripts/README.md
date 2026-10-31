@@ -303,7 +303,9 @@ There are no retries or automatic skips. Each invocation records queued,
 started, succeeded, failed or interrupted changes, timestamps, branch/commit,
 observed `origin/dev` and plan hash in a TSV file under the worktree's
 Git metadata directory, `codex-plan-runs/`; its exact path is printed at startup.
-The common Git directory holds `codex-plan-run.lock`. These files survive branch
+The common Git directory holds `codex-plan-run.lock`, which `pi-plan-run.sh`
+shares: Codex and Pi plan runs can never dispatch workflows into the same
+repository concurrently. These files survive branch
 switches and are not staged by the workflow. SIGINT/SIGTERM stops the active
 workflow process group and records an interruption (exit 130/143). Interactive
 Codex recovery retains its controlling terminal; piped standard input is also
@@ -451,14 +453,19 @@ and is removed on exit.
 `pi-code-implement.pl` invokes `$mch-code-implement` through `pi -p --mode
 json --thinking high --approve`, parses the final Pi assistant event, and keeps
 the same clean-tree, branch, result, commit, push, progress, failure, and
-interruption guarantees as the Codex implementation helper.
+interruption guarantees as the Codex implementation helper. A final assistant
+event whose `stopReason` is not `stop` (for example `error`, `aborted` or
+`length`) is rejected before any commit: Pi JSON mode can exit zero after an
+incomplete response, so partial work stays uncommitted for inspection.
 
 `pi-review-loop.pl` keeps Codex for every `codex exec review` pass. Only a pass
 with findings hands those findings to `$mch-findings-fix` on stdin through
 `pi -p --mode json --thinking high --approve`. The loop parses Pi's final
-assistant event into its temporary fix-result file, reports the Pi session ID,
-and retains the same Codex review options, scope checks, commits, pushes, and
-re-review behavior as `codex-review-loop.pl`.
+assistant event into its temporary fix-result file, rejecting any final event
+that did not complete with `stopReason: "stop"` so incomplete fixes are never
+committed, reports the Pi session ID, and retains the same Codex review
+options, scope checks, commits, pushes, and re-review behavior as
+`codex-review-loop.pl`.
 
 Controlled Pi checks use fake Codex and Pi executables:
 

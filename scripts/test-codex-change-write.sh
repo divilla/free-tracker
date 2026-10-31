@@ -34,7 +34,7 @@ if [[ ${1-} == resume ]]; then
 	exit "${CODEX_TEST_RESUME_EXIT:-0}"
 fi
 [[ $# -eq 11 && $1 == exec && $2 == --json ]]
-[[ $3 == --model && $4 == gpt-6.1-sol ]]
+[[ $3 == --model && $4 == gpt-6-astra ]]
 [[ $5 == -c && $6 == 'model_reasoning_effort="high"' ]]
 [[ $7 == -c && $8 == 'service_tier="default"' ]]
 [[ $9 == -o && ${11} == '$mch-change-write' ]]

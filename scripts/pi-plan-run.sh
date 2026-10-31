@@ -97,7 +97,10 @@ cd -- "$repo_root"
 git_dir=$(git rev-parse --absolute-git-dir) || fail 'repository is required'
 common_dir=$(git rev-parse --git-common-dir) || exit $?
 common_dir=$(cd -- "$common_dir" && pwd)
-exec 9>"$common_dir/pi-plan-run.lock"
+# Serialize against codex-plan-run.sh on the same repository-wide lock; the
+# Codex and Pi plan runners must never dispatch workflows into one checkout
+# concurrently.
+exec 9>"$common_dir/codex-plan-run.lock"
 flock -n 9 || fail 'another plan run is active in this repository'
 changes=$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none) || exit $?
 [[ -z $changes ]] || fail 'uncommitted work detected; commit or stash it before running'

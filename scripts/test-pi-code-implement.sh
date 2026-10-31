@@ -22,6 +22,7 @@ cp "$script_dir/test-lib/ssh-add" "$fake_bin/ssh-add"
 export MCH_GIT_SSH_KEY="$test_root/test-key"
 printf '%s\n' '# Domain types' >"$repo/agent/changes/000-domain-types.md"
 printf '%s\n' '# Failing change' >"$repo/agent/changes/001-failing-change.md"
+printf '%s\n' '# Incomplete response change' >"$repo/agent/changes/002-incomplete-response.md"
 printf '%s\n' 'old production' >"$repo/production.go"
 
 cat >"$fake_bin/pi" <<'EOF'
@@ -43,7 +44,14 @@ if [[ ${PI_TEST_FAIL-} == 1 ]]; then
 	exit 42
 fi
 
-printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Implementation complete."}]}}'
+if [[ ${PI_TEST_INCOMPLETE_STOP-} == 1 ]]; then
+	# Pi exited zero after an error response, having already made partial edits.
+	printf '%s\n' 'partial implementation' >production.go
+	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error"}}'
+	exit 0
+fi
+
+printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Implementation complete."}],"stopReason":"stop"}}'
 printf '%s\n' 'new production' >production.go
 EOF
 chmod +x "$fake_bin/pi"
@@ -93,6 +101,28 @@ set -e
 grep -Fxq 'Pi session ID: implementation-session' "$failed_output"
 grep -Fxq 'pi-code-implement: Pi command failed with exit code 42' "$failed_error"
 grep -Fxq '  simulated implementation failure' "$failed_error"
+
+# PI-IMPLEMENT-INCOMPLETE: a zero exit with an unsuccessful final assistant
+# stop reason must be rejected before any commit or push; partial edits stay
+# uncommitted for inspection.
+git -C "$repo" checkout -q master
+git -C "$repo" checkout -q -b change/002-incomplete-response
+incomplete_output="$test_root/incomplete-output"
+incomplete_error="$test_root/incomplete-error"
+set +e
+(
+	cd "$repo"
+	PATH="$fake_bin:$PATH" PI_TEST_INCOMPLETE_STOP=1 ./scripts/pi-code-implement.pl
+) >"$incomplete_output" 2>"$incomplete_error"
+incomplete_status=$?
+set -e
+[[ $incomplete_status -eq 1 ]]
+grep -Fxq 'Pi session ID: implementation-session' "$incomplete_output"
+grep -Fxq "pi-code-implement: Pi final assistant response ended with stopReason 'error', not 'stop'" "$incomplete_error"
+[[ $(git -C "$repo" log -1 --format=%s) == initial ]]
+! git -C "$repo" rev-parse --verify --quiet refs/remotes/origin/change/002-incomplete-response
+[[ $(<"$repo/production.go") == 'partial implementation' ]]
+[[ -n $(git -C "$repo" status --short) ]]
 
 set +e
 (

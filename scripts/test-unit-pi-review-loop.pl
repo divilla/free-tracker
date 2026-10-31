@@ -47,16 +47,53 @@ assert_equal($missing_session_id, undef,
 my $pi_output = join "\n",
 	'{"type":"message_start","message":{"role":"assistant"}}',
 	'{"type":"message_end","message":{"role":"user","content":"ignored"}}',
-	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"first"}]}}',
-	'{"type":"message_end","message":{"role":"assistant","content":"last"}}';
-assert_equal(final_response_from_pi_output($pi_output), 'last',
+	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"first"}],"stopReason":"toolUse"}}',
+	'{"type":"message_end","message":{"role":"assistant","content":"last","stopReason":"stop"}}';
+my ($final_response, $final_stop_reason) = final_response_from_pi_output($pi_output);
+assert_equal($final_response, 'last',
 	'LOOP-PI-RESULT: use the final assistant response');
-assert_equal(final_response_from_pi_output(
-	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"one"},{"type":"text","text":" two"}]}}'
-), 'one two', 'LOOP-PI-RESULT: concatenate assistant text blocks');
-assert_equal(final_response_from_pi_output(
-	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","text":"ignored"}]}}'
-), '', 'LOOP-PI-RESULT: non-text assistant blocks contribute no text');
+assert_equal($final_stop_reason, 'stop',
+	'LOOP-PI-RESULT: report the final assistant stop reason');
+my ($joined_response, $joined_stop_reason) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"one"},{"type":"text","text":" two"}],"stopReason":"stop"}}'
+);
+assert_equal($joined_response, 'one two', 'LOOP-PI-RESULT: concatenate assistant text blocks');
+assert_equal($joined_stop_reason, 'stop', 'LOOP-PI-RESULT: completed responses report stop');
+my ($blocks_response, $blocks_stop_reason) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","text":"ignored"}],"stopReason":"stop"}}'
+);
+assert_equal($blocks_response, '', 'LOOP-PI-RESULT: non-text assistant blocks contribute no text');
+assert_equal($blocks_stop_reason, 'stop', 'LOOP-PI-RESULT: completed responses report stop');
+my ($error_response, $error_stop_reason) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"fixed one file"}],"stopReason":"error"}}'
+);
+assert_equal($error_response, 'fixed one file',
+	'LOOP-PI-RESULT: an error response still yields its text for reporting');
+assert_equal($error_stop_reason, 'error',
+	'LOOP-PI-RESULT: an error stop reason must be surfaced for rejection');
+my ($aborted_response, $aborted_stop_reason) = final_response_from_pi_output(
+	join("\n",
+		'{"type":"message_end","message":{"role":"assistant","content":"interrupted work","stopReason":"aborted"}}',
+		'{"type":"message_end","message":{"role":"assistant","content":"recovered afterwards","stopReason":"stop"}}')
+);
+assert_equal($aborted_response, 'recovered afterwards',
+	'LOOP-PI-RESULT: an earlier aborted turn does not hide a later completion');
+assert_equal($aborted_stop_reason, 'stop',
+	'LOOP-PI-RESULT: only the final stop reason decides acceptance');
+my ($length_response, $length_stop_reason) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":"truncated","stopReason":"length"}}'
+);
+assert_equal($length_response, 'truncated',
+	'LOOP-PI-RESULT: a length response still yields its text for reporting');
+assert_equal($length_stop_reason, 'length',
+	'LOOP-PI-RESULT: a length stop reason must be surfaced for rejection');
+my ($unlabelled_response, $unlabelled_stop_reason) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":"unlabelled"}}'
+);
+assert_equal($unlabelled_response, 'unlabelled',
+	'LOOP-PI-RESULT: an unlabelled response still yields its text for reporting');
+assert_equal($unlabelled_stop_reason, '(missing)',
+	'LOOP-PI-RESULT: a missing stop reason must be surfaced for rejection');
 
 my $rendered = '';
 open my $progress_output, '>:raw', \$rendered or die "cannot create progress capture: $!";

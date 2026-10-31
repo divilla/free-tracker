@@ -85,16 +85,21 @@ sub assistant_text_from_message {
 	return $text;
 }
 
+# Returns the final assistant response together with its stop reason. JSON mode
+# can exit zero after an assistant message that stopped with "error", "aborted",
+# "length" or another non-success reason; only "stop" is a completed response.
 sub final_response_from_pi_output {
 	my ($output) = @_;
-	my $response;
+	my ($response, $stop_reason);
 	for my $line (split /\n/, $output) {
 		my $event = eval { decode_json($line) };
 		next if ref($event) ne 'HASH' || ($event->{type} // '') ne 'message_end';
-		my $text = assistant_text_from_message($event->{message});
-		$response = $text if defined $text;
+		next if ref($event->{message}) ne 'HASH' || ($event->{message}{role} // '') ne 'assistant';
+		my $reason = $event->{message}{stopReason};
+		$stop_reason = defined $reason && !ref($reason) ? $reason : '(missing)';
+		$response = assistant_text_from_message($event->{message});
 	}
-	return $response;
+	return ($response, $stop_reason);
 }
 
 sub shell_quote {
@@ -395,8 +400,17 @@ sub run_pi {
 		}
 	}
 	else {
-		my $response = final_response_from_pi_output($output);
+		my ($response, $stop_reason) = final_response_from_pi_output($output);
 		fail('Pi did not emit a final assistant response') if !defined $response;
+		if ($stop_reason ne 'stop') {
+			print STDERR "pi-review-loop: Pi final assistant response ended with stopReason '$stop_reason', not 'stop'\n";
+			if (-s $active_error_log) {
+				my $errors = read_file($active_error_log);
+				$errors =~ s/^/  /mg;
+			print STDERR "pi-review-loop: Pi command diagnostics:\n$errors";
+			}
+			exit 1;
+		}
 		write_file($fix_result_file, encode_utf8($response));
 	}
 	unlink $active_output_log;

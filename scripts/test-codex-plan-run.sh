@@ -59,8 +59,8 @@ git -C "$repo" update-ref refs/remotes/origin/dev HEAD
 cat >"$test_root/expected" <<'SLUGS'
 001-build-scaffold
 002-setup-decisions
-003-workflow-run-state
-004-workflow-review-merge
+003-fix-tests
+004-remove-worktrees
 005-app-test-foundation
 006-android-tracking-spike
 007-measurement-contract
@@ -225,6 +225,12 @@ rm "$repo/unrelated.txt"
 
 # PLAN-RUN-LOCK / PLAN-RUN-INTERRUPT: concurrent invocations cannot dispatch;
 # termination stops the child and records an interruption, not a success.
+# The Pi plan runner shares the Codex lock file, so install it (committed, to
+# keep the tree clean) before exercising mutual exclusion in both directions.
+cp "$script_dir/pi-plan-run.sh" "$repo/scripts/pi-plan-run.sh"
+cp "$repo/scripts/codex-flow-run.sh" "$repo/scripts/pi-flow-run.sh"
+git -C "$repo" add scripts
+git -C "$repo" commit -q -m 'Add Pi plan runner'
 : >"$PLAN_TEST_CALLS"
 PLAN_TEST_HOLD=1 bash "$runner" >"$test_root/held-output" 2>"$test_root/held-error" &
 runner_pid=$!
@@ -241,6 +247,10 @@ PLAN_TEST_REPO="$test_root/linked worktree" bash "$test_root/linked worktree/scr
 	>"$test_root/linked-output" 2>"$test_root/linked-error" || status=$?
 [[ $status -eq 1 && ! -s $PLAN_TEST_CALLS ]]
 grep -q 'another plan run is active' "$test_root/linked-error"
+status=0
+bash "$repo/scripts/pi-plan-run.sh" >"$test_root/pi-blocked-output" 2>"$test_root/pi-blocked-error" || status=$?
+[[ $status -eq 1 ]]
+grep -q 'another plan run is active' "$test_root/pi-blocked-error"
 kill -TERM "$runner_pid"
 status=0
 wait "$runner_pid" || status=$?
@@ -249,6 +259,31 @@ runner_pid=''
 log=$(sed -n 's/^codex-plan-run: progress log: //p' "$test_root/held-error")
 [[ $(awk -F '\t' '$1 == "interrupted" {print $3 ":" $4}' "$log") == '001-build-scaffold:143' ]]
 ! grep -q '^Completed ' "$test_root/held-output"
+
+# Reverse direction: while a Pi plan run holds the shared lock, the Codex runner
+# is rejected, and interrupting the Pi runner records an interruption.
+rm -f "$PLAN_TEST_READY" "$PLAN_TEST_STOPPED"
+: >"$PLAN_TEST_CALLS"
+PLAN_TEST_HOLD=1 bash "$repo/scripts/pi-plan-run.sh" \
+	>"$test_root/pi-held-output" 2>"$test_root/pi-held-error" &
+runner_pid=$!
+for ((attempt=0; attempt<200; attempt++)); do
+	[[ ! -e $PLAN_TEST_READY ]] || break
+	sleep 0.05
+done
+[[ -e $PLAN_TEST_READY ]]
+reject 1
+grep -q 'another plan run is active' "$test_root/error"
+rm -f "$PLAN_TEST_STOPPED"
+kill -TERM "$runner_pid"
+status=0
+wait "$runner_pid" || status=$?
+runner_pid=''
+[[ $status -eq 143 && -e $PLAN_TEST_STOPPED ]]
+pi_log=$(sed -n 's/^pi-plan-run: progress log: //p' "$test_root/pi-held-error")
+[[ $(awk -F '\t' '$1 == "interrupted" {print $3 ":" $4}' "$pi_log") == '001-build-scaffold:143' ]]
+! grep -q '^Completed ' "$test_root/pi-held-output"
+[[ -z $(git -C "$repo" status --short) ]]
 
 # PLAN-RUN-SOURCE: names come from the current inventory, not a hard-coded list.
 sed 's/025-play-release-readiness/025-alternative/g' "$test_root/original-plan" >"$repo/agent/PLAN.md"
