@@ -105,7 +105,7 @@ class ScaffoldE2E(ScaffoldSystemCase):
         self.mutate('agent/reference-scaffold.md',lambda t:t+'\n[missing](../absent.dart)\n')
         self.mutate('agent/reference-scaffold.md',lambda t:t.replace('S005','future'))
 
-    def test_S001_T30_e2e(self):
+    def test_scaffold_rejects_excluded_features(self):
         self.mutate('pubspec.yaml',lambda t:t.replace('package_info_plus: 10.2.2','google_mobile_ads: 10.2.2'))
         self.mutate('android/app/src/main/AndroidManifest.xml',lambda t:t.replace('<application','<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><application',1))
 

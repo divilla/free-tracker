@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Both stable Make targets enforce per-row executed unit and E2E coverage."""
+"""Require executed unit tests per requirement and distinct E2E tests per case."""
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -27,22 +27,20 @@ def run(mode, root):
         return text
 
     try:
-        cases = case_contract.load_cases(root)
+        contract = case_contract.load_contract(root)
         if mode == 'unit':
             app = json.loads((root / 'build/test-results/unit/summary.json').read_text())
             if app['status'] != 'passed':
                 raise ValueError('application unit suite did not pass')
-            output = command(['prove', '-v', 'scripts/test-unit-workflow-run-state.pl',
-                              'scripts/test-workflow-evidence.pl'], 'workflow-unit.tap')
-            if re.search(r'#\s*(?:SKIP|TODO)\b', output, re.I):
-                raise ValueError('required workflow unit test was skipped/TODO')
             for name in ('codex-code-implement', 'codex-review-loop', 'codex-change-write'):
                 command(['perl', 'scripts/test-unit-' + name + '.pl'], name + '.txt')
             command(['perl', 'scripts/test-codex-session.pl'], 'codex-session.tap')
-            names = re.findall(r'\bS[0-9]{3,}_T[0-9]{2,}_[\w]+', output)
-            names += app['core']['tests'] + app['flutter']['tests']
-            names += re.findall(r'^test_(\w+)', (root / 'build/test-results/unit/tooling.txt').read_text(), re.M)
-            report.update(case_contract.require_executed(cases, names, 'unit'))
+            executed = app['core']['executed'] + app['flutter']['executed']
+            tooling = (root / 'build/test-results/unit/tooling.txt').read_text()
+            for name, module in re.findall(r'^(test_\w+) \(([\w.]+)\) \.\.\. ok$', tooling, re.M):
+                executed.append({'file': 'tool/tests/' + module.split('.')[0] + '.py', 'name': name})
+            report.update(case_contract.require_executed(contract, executed, 'unit'))
+            report['executed'] = executed
         elif mode == 'e2e':
             host_file = reports / 'host.json'
             host_file.unlink(missing_ok=True)
@@ -60,8 +58,8 @@ def run(mode, root):
                 for path, count in suite['counts'].items():
                     if not count:
                         raise ValueError('empty Android suite: ' + path)
-                    executed.extend({'file': path, 'name': name} for name in suite['tests'])
-            report.update(case_contract.require_executed(cases, executed, 'e2e'))
+                executed.extend(suite['executed'])
+            report.update(case_contract.require_executed(contract, executed, 'e2e'))
             report['executed'] = executed
         else:
             raise ValueError('unknown mode: ' + mode)

@@ -22,7 +22,7 @@ sub workflow_fixture {
         copy("$scripts/$script", "$f->{repo}/scripts/$script") or die $!;
         chmod 0755, "$f->{repo}/scripts/$script" or die $!;
     }
-    for my $module (qw(GitAuth.pm Release.pm Progress.pm CodexSession.pm WorkflowEvidence.pm)) {
+    for my $module (qw(GitAuth.pm Release.pm Progress.pm CodexSession.pm)) {
         copy("$scripts/lib/mch/$module", "$f->{repo}/scripts/lib/mch/$module") or die $!;
     }
     for my $name ('123-auth', '124-new') {

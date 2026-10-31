@@ -92,8 +92,6 @@ done
 mkdir -p "$repo/scripts/lib/mch" "$test_root/bin"
 cp "$script_dir/lib/mch/Progress.pm" "$script_dir/lib/mch/GitAuth.pm" "$script_dir/lib/mch/Release.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
-cp "$script_dir/lib/mch/WorkflowEvidence.pm" "$repo/scripts/lib/mch/"
-cp "$script_dir/workflow-evidence.pl" "$repo/scripts/"
 cp "$script_dir/test-lib/ssh-add" "$test_root/bin/"
 export PATH="$test_root/bin:$PATH"
 export MCH_GIT_SSH_KEY="$test_root/test-key"
@@ -138,25 +136,14 @@ elif [[ $prompt == '$mch-code-implement' ]]; then
 	[[ $auto_approve -eq 1 ]]
 	[[ -r $change ]]
 	printf '%s\n' implement >>"$FLOW_TEST_CALLS"
-	if [[ -n ${FLOW_TEST_DEPENDENCY_SLUG:-} ]]; then
-		# WF-EVIDENCE-R01: only Git integration and required contents matter
-		# downstream; missing historical review receipts are not a gate.
-		perl scripts/workflow-evidence.pl "$FLOW_TEST_DEPENDENCY_SLUG" dev |
-			perl -MJSON::PP -0777 -e 'my $s=decode_json(<>); die unless $s->{integration} eq "verified" && $s->{review} eq "unverified";'
-		[[ -r implementation.txt ]]
-		grep -Fxq 'Review/commit/merge: not run' agent/historical-handoff.md
-	fi
 	printf 'Implemented behavior for %s\n' "$FLOW_TEST_SLUG" >implementation.txt
 	printf '%s\n' 'Implementation complete.' >"$result"
-	printf '%s\n' '{"schema":1,"outcome":"complete"}' >"$MCH_IMPLEMENTATION_OUTCOME_FILE"
 else
 	exit 99
 fi
 printf '%s\n' '{"type":"turn.completed"}'
 CODEX
 chmod +x "$test_root/bin/codex"
-mkdir -p "$repo/agent"
-printf '%s\n' 'Review/commit/merge: not run' >"$repo/agent/historical-handoff.md"
 git init --bare -q "$test_root/origin.git"
 git -C "$repo" init -q -b master
 git -C "$repo" config user.name 'Flow Test'
@@ -195,26 +182,6 @@ for release_branch in stage master; do
 	[[ $(git --git-dir="$test_root/origin.git" rev-parse "refs/heads/$release_branch") == "$initial" ]]
 done
 [[ -z $(git -C "$repo" status --short) ]]
-
-# WF-EVIDENCE-R02: results survive temporary-output cleanup and squash rewriting.
-(cd "$repo" && perl scripts/workflow-evidence.pl "$FLOW_TEST_SLUG" dev) |
-	perl -MJSON::PP -0777 -e 'my $s=decode_json(<>); die unless $s->{integration} eq "verified" && $s->{review} eq "verified"; die unless grep { ($_->{response}//"") =~ /No issues found/ } @{$s->{receipts}};'
-
-# WF-EVIDENCE-R01: simulate a legacy dependency without retained review logs.
-# The next complete workflow must run with its old handoff untouched.
-export FLOW_TEST_DEPENDENCY_SLUG="$FLOW_TEST_SLUG"
-mv "$repo/.git/mch-workflow-evidence/$FLOW_TEST_SLUG" "$test_root/archived-first-evidence"
-export FLOW_TEST_SLUG='1004-next_dependency'
-: >"$FLOW_TEST_CALLS"
-bash "$repo/scripts/codex-flow-run.sh" "$FLOW_TEST_SLUG" >"$test_root/next-output" 2>"$test_root/next-error" || {
-	cat "$test_root/next-output" "$test_root/next-error" >&2
-	exit 1
-}
-cmp "$test_root/expected-real" "$FLOW_TEST_CALLS"
-[[ $(git -C "$repo" branch --show-current) == dev ]]
-grep -Fxq 'Review/commit/merge: not run' "$repo/agent/historical-handoff.md"
-unset FLOW_TEST_DEPENDENCY_SLUG
-printf '%s\n' 'WF-EVIDENCE-R01 next workflow accepts integrated dependency without predecessor review receipts'
 
 # Done without an authored file must fail at document review, before either
 # implementation or the final review can run.

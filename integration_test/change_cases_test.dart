@@ -66,6 +66,27 @@ void main() {
       expect(find.text('Version: 1.0.0'), findsOneWidget);
       expect(find.text('Application ID: $expectedId'), findsOneWidget);
     },
+    30: (tester) async {
+      for (final synchronous in [true, false]) {
+        var reads = 0;
+        final loader = createAppInfoLoader(
+          repository: Repository(() {
+            if (++reads > 1) return Future.value(success(version: 'recovered'));
+            if (synchronous) throw StateError('private repository error');
+            return Future.error(StateError('private repository error'));
+          }),
+        );
+        await mount(tester, loader);
+        expect(find.text('Retry'), findsOneWidget);
+        expect(find.textContaining('Version:'), findsNothing);
+        expect(find.textContaining('private repository error'), findsNothing);
+        await tester.tap(find.text('Retry'));
+        await tester.pumpAndSettle();
+        expect(find.text('Version: recovered'), findsOneWidget);
+        expect(find.text('Retry'), findsNothing);
+        expect(reads, 2);
+      }
+    },
     5: (tester) async {
       await mount(
         tester,

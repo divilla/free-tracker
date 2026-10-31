@@ -3,7 +3,6 @@ use strict;
 use warnings;
 use Exporter 'import';
 use mch::GitAuth qw(require_git_auth);
-use mch::WorkflowEvidence qw(save_receipt);
 
 our @EXPORT_OK = qw(run_cli merge_to_dev promote ensure_release_branches);
 
@@ -188,10 +187,6 @@ sub merge_to_dev {
     my $base = fetched_head('dev');
     ancestor($base, $original) or fail('rebase needed: origin/dev is not an ancestor of HEAD');
 
-    my $evidence = { phase => 'merge', source => $original, baseline => $base,
-        branch => $branch, tree => capture(qw(git rev-parse HEAD^{tree})) };
-    save_receipt($name, { %$evidence, outcome => 'started' });
-
     my $message = "Implement change $name";
     my $parents = capture('git', 'rev-list', '--parents', '-n', '1', $original);
     my $subject = capture('git', 'log', '-1', '--format=%s', $original);
@@ -213,9 +208,6 @@ sub merge_to_dev {
     my $published = remote_head('dev');
     $published eq $squashed
         or fail("origin/dev $published does not match squashed change commit $squashed");
-    # Publish verified integration before optional source-branch deletion. A
-    # cleanup failure cannot erase the fact that dev was successfully updated.
-    save_receipt($name, { %$evidence, outcome => 'verified', merge_commit => $squashed });
     run('git', 'push', "--force-with-lease=refs/heads/$branch:$squashed", 'origin', '--delete', $branch);
     print "Merged $squashed into dev\n";
 }

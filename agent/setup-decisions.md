@@ -86,7 +86,7 @@ This confirms the source handoff, not independent review or verified squash proc
 
 | Resource | State | Evidence and limits | Owner / blocking gate | Next action |
 | --- | --- | --- | --- | --- |
-| Host/toolchain | partial | 2026-10-30; scope: Fedora 43 x86_64, Python 3.14.8 and Flutter/Dart paths present; S001 tested versions above; limits: sandbox SDK cache writes require reviewed host execution; see environment record | S003; before workflow checks; S005 before app checks | Recheck installed tools and run applicable suites with reviewed host access when required |
+| Host/toolchain | partial | 2026-10-30; scope: Fedora 43 x86_64, Python 3.14.8 and Flutter/Dart paths present; S001 tested versions above; limits: sandbox SDK cache writes require reviewed host execution; see environment record | S003; before test checks; S005 before app checks | Recheck installed tools and run applicable suites with reviewed host access when required |
 | Configured emulator | partial | 2026-10-30; scope: S001 historically executed on Free_Tracker_API_37, API 37 x86_64, emulator-5554; limits: not probed live for S002, not phone sensing or screen-off proof | S005; before Android checks; S006 before feasibility | Recheck ADB device, AVD identity and boot completion before selecting current ID |
 | Physical phones | unknown | Unknown: no authorized phone inventory or trials supplied; model/vendor, Android/API, memory class, ABI, Google services and step/location capability all untested; planned older/low-memory and recent/multi-vendor matrix, suitable/missing step sensing, Google/non-Google services | S006; before physical feasibility; S022 before device/endurance acceptance | Obtain non-secret device access/capability records and perform real adapter/screen-off/recovery trials; do not infer phones from packaged ABIs |
 | Reference course/observed steps | unknown | Unknown: no independently measured course or observed-step resources supplied; no accuracy/tolerance evidence | S008; before baseline trials; S023 before held-out acceptance | Identify independent outdoor/indoor references and observers, document path/placement/pace and tuning versus held-out split |
@@ -214,7 +214,7 @@ S002 executable evidence is updated only after commands execute. Ignored
 artifacts, not required portable links or independent review evidence. Optional
 S001 raw logs/APK may be absent without changing the historical summary.
 
-Next consumers: S003 audits existing scripts and bootstrap prerequisites; S005
+Next consumers: S003 fixes requirement/unit and case/E2E coverage; S004 audits existing scripts and bootstrap prerequisites; S005
 extends this app/test infrastructure with SQLite; S006 consumes physical/support
 blockers; S020 consumes maps/account constraints; S021/S024/S025 fulfill privacy
 and release inputs. S001 checks do not advance S002, GW or G1–G7. The caller owns

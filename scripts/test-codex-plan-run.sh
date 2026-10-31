@@ -59,7 +59,7 @@ git -C "$repo" update-ref refs/remotes/origin/dev HEAD
 cat >"$test_root/expected" <<'SLUGS'
 001-build-scaffold
 002-setup-decisions
-003-workflow-run-state
+003-test-traceability
 004-workflow-review-merge
 005-app-test-foundation
 006-android-tracking-spike

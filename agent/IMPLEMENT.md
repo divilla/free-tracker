@@ -1,6 +1,6 @@
 # free-tracker — Scripted implementation workflow
 
-**Status:** Execution contract adopted; legacy helpers and observation receipts are present, but S003–S004/GW conformance is not yet established.
+**Status:** Execution contract adopted; legacy helpers are present, but S004/GW conformance is not yet established.
 
 ## 1. Purpose and ownership
 
@@ -111,7 +111,7 @@ unfinished. Authoring alone still does not claim implementation results.
 Implementers add the selected change and all its cases; future document authoring
 does not activate unimplemented tests. `tool/case_contract.py` audits every
 document's mapping and enforces executed unit/E2E identities for that inventory.
-`make unit-test` runs app/tooling and workflow unit suites; `make end-to-end-test`
+`make unit-test` runs app/tooling unit suites; `make end-to-end-test`
 runs host-command tests and all Android suites, then rejects missing per-row
 coverage. Reports are under `build/test-results/change-unit/` and `change-e2e/`
 alongside the app reports. Older dated N/A observations are historical, not
@@ -138,33 +138,6 @@ stage even when they do not block an earlier deterministic tooling change.
 A merged change is not automatically a completed product requirement. Mark a requirement complete only when all its implementation and validation obligations are satisfied. Whole-app completion additionally requires the PRD acceptance and release gates; a set of clean reviews is insufficient.
 
 ## 5. Script reliability and execution records
-
-### Legacy observation receipts (bootstrap correction)
-
-The legacy implementation/review/merge helpers retain immutable schema-1 JSON
-observations under the common Git directory's `mch-workflow-evidence/<slug>/`.
-These are diagnostics, not a competing run ledger, automatic dependency approval,
-or proof of GW. S003/S004 must reuse/import these observations rather than
-discarding their history when implementing authoritative state/projections.
-`perl scripts/workflow-evidence.pl <slug> <dev-commit-or-ref>` is read-only: it
-reports integration from exact change commits reachable in Git, independently
-of receipts. Optional merge observations are checked against Git tree/parent;
-diagnostic code review is verified only when the latest code-review observation
-is clean and its exact baseline and reviewed tree match that integration. Failed,
-incomplete, missing or stale observations never become passing outcomes and do
-not undo Git integration. Diagnostic review status is not a downstream dependency
-gate. Document review cannot substitute for code review. Diagnostic errors are
-reported separately and never veto Git integration. Check summaries are retained as reported
-artifacts (including their revision/content digest), not blindly certified
-because a model says implementation is complete. Consumers still verify the
-applicable commands, scope, revisions/content and outcomes.
-
-Implementation uses a private `MCH_IMPLEMENTATION_OUTCOME_FILE` JSON object
-with `schema: 1` and `outcome: complete|blocked|failed`. Missing/invalid/noncomplete
-outcomes stop nonzero before commit/review/merge, even when Codex itself exits 0;
-the progress indicator must not present that blocked attempt as successful.
-These additions do not retrofit the legacy merge procedure into compliance with
-the serialization/final-source/retry contracts below.
 
 When added, the scripts must:
 

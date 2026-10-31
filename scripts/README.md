@@ -324,7 +324,7 @@ not completion evidence; reconcile the active change with Git before continuing.
 This is a plan-level sequencer, not a replacement for per-change test, review,
 dependency or merge gates, and it never infers product validation from workflow
 exit status. PLAN §7's bootstrap/manual-equivalent obligations remain in force
-until S003–S004 audit and prove the underlying automation. It does not authorize
+until S004 audits and proves the underlying automation. It does not authorize
 external account actions or publication and does not claim full IMPLEMENT
 conformance of the existing helpers.
 
@@ -400,56 +400,6 @@ nonzero exits. Temporary results and logs are cleaned on exit.
 
 ## `codex-code-implement.pl`
 
-### Dependency readiness and retained workflow observations
-
-Dependency readiness is integration plus the code/contracts and validation
-needed by the current stage. **Subsequent changes do not re-audit predecessor
-review/fix history.** Each change's own delivering workflow enforces its review
-loop. Find the exact `Implement change <slug>` commit reachable from the selected
-`dev` baseline and inspect required contents. A subject line alone is not proof
-of required behavior or device/product validation. Old handoff `not run` notes
-and missing historical receipts are not additional downstream delivery gates;
-no replacement handoff or publisher confirmation is required.
-
-Read-only optional diagnostics, from the repository/checkout:
-
-```shell
-perl scripts/workflow-evidence.pl 002-setup-decisions dev
-```
-
-The JSON reports the exact resolved baseline, `integration` (`verified`,
-`unverified`, or `ambiguous` if multiple exact change commits exist), optional
-review diagnostics, and retained receipts. Exit 0 means inspection succeeded,
-not that all delivery/product gates passed. Git integration is independent of
-review receipts. A clean diagnostic code review requires the latest code-review
-receipt to match the squash tree and parent baseline; document review never
-substitutes for code review. Unknown/stale/failed review diagnostics do not undo
-integration or become downstream prerequisites. Missing required code/contracts
-or current-stage validation still block, with a concrete requirement/reason.
-
-The implementation/review/merge helpers now append private schema-1 JSON
-observations beneath `git rev-parse --absolute-git-dir`, in
-`mch-workflow-evidence/<slug>/<unique-observation>/receipt.json`. They retain
-responses, exact source/tree/baseline where applicable, review mode/pass/outcome,
-implementation command outcome and any available app check-summary contents,
-and the verified published merge SHA. Check reports retain their own revision
-and dirty-content digest; presence/model prose does not certify them. Inspect
-scope and content identity before using a report as check evidence. Temporary
-output can be removed without losing these observations. They remain local,
-survive branch switches in the existing checkout, are not automatically staged/pushed, and
-must be explicitly archived for portability. Missing observations for older
-runs need no backfill. Interrupted observations stay incomplete; malformed or
-conflicting receipts produce explicit diagnostic errors and unverified review
-status, without overriding Git integration or inventing passing observations.
-
-These receipts are diagnostics, not S003's authoritative run-state/projection
-schema or a claim of GW conformance. S003/S004 must reuse/import their evidence.
-No new lock/retry/unattended-merge guarantees are implied.
-
-Run the mapped unit and real-Git regressions with `make workflow-test`. They
-use deterministic Codex adapters and temporary local remotes; no real Codex,
-publisher remote or device is used.
-
 Implement the current branch's already-authored change:
 
 ```shell
@@ -490,17 +440,11 @@ derived from the branch for validation and context display, not passed to the
 skill.
 The command has the same elapsed-time, output-marker, activity-marker, success, failure, and
 interrupt behavior as `codex-review-loop.pl`. Raw JSON output is suppressed on
-success and printed on failure. The caller sets a private
-`MCH_IMPLEMENTATION_OUTCOME_FILE`; the skill must write
-`{"schema":1,"outcome":"complete"}`, or `blocked`/`failed` as appropriate.
-Missing, malformed, blocked or failed outcomes stop nonzero before any commit or
-subsequent workflow phase, even if Codex exits 0 or leaves partial edits. The
-implementation progress line shows failure for those attempts. No prose parsing
-or green process exit substitutes for an explicit completed outcome. On complete,
-the script also requires a final response and repository changes. It prints the final response between the
+success and printed on failure. When Codex succeeds, the script requires both a
+final response and repository changes. It prints the final response between the
 progress line and the changed-file list, then commits and pushes the changes as
 `Implement code <slug>`. Temporary output stays outside the repository
-and is removed on exit after retaining the observation receipt.
+and is removed on exit.
 
 ## `codex-review-loop.pl`
 
@@ -638,153 +582,3 @@ fixer's stdin redirection is rendered on a separate line, so neither separator
 extends into that line. Codex runs in JSON mode so progress events remain
 streamable while their raw content is suppressed on success. If Codex fails,
 its captured output is printed to standard error for diagnosis.
-
-# Durable preparation — S003 (not delivery automation)
-
-From **any working directory**, use the script's actual repository path:
-
-```shell
-perl scripts/workflow-run.pl start 004-workflow-review-merge --local
-perl scripts/workflow-run.pl start 004-workflow-review-merge --remote origin
-perl scripts/workflow-run.pl status --run r-0123456789abcdef0123456789abcdef
-perl scripts/workflow-run.pl preflight --run r-0123456789abcdef0123456789abcdef
-perl scripts/workflow-run.pl resume --run r-0123456789abcdef0123456789abcdef
-```
-
-The example S004 change must first be authored and its prerequisites verified;
-these commands do not select pending work or author documents. Exactly one of
-`--local`/`--remote NAME` is required. Git, Perl (core JSON::PP, IO::Handle,
-Digest::SHA, Fcntl), Bash and Python 3 are required. The supported host must provide
-POSIX flock, fork/process groups, atomic rename and file/directory fsync.
-Local mode explicitly selects local `refs/heads/dev` and records remote freshness
-**not checked**. Remote mode uses configured authentication noninteractively and
-an explicit `+refs/heads/dev:refs/remotes/NAME/dev` fetch, even in restricted clones.
-It preserves local dev. Authentication/fetch failure never falls back to cached
-refs/local mode. Diagnostics suppress raw child output and credential-bearing URLs.
-Resume binds the effective remote URL by a private digest, never the URL itself;
-changed remote configuration blocks before fetching.
-No release branches are initialized; no remote refs are written.
-
-Start requires a clean existing checkout (including hidden untracked files and
-dirty submodules), a unique exact PLAN/change identity and absent change branch/run.
-It creates and selects `change/<slug>` in this checkout at the selected baseline,
-using non-forcing `git checkout --no-overwrite-ignore -b`. No destination option,
-additional checkout or destination-owner record exists. It never resets, stashes,
-stages, commits, pushes, invokes Codex or dispatches a legacy flow. Non-forcing
-checks repeat after refresh. Ignored files are not overwritten.
-
-## Prerequisite evidence representation (schema 1)
-
-For consumers with dependencies, an operator supplies the reviewed, scoped
-`agent/progress/prerequisites/<consumer-slug>.json` in the caller repository.
-It is an input, not a producer's review receipt or a gate inferred from prose.
-It must contain `schema: 1`, `consumer`, and a `dependencies` object keyed by
-**every direct and transitive dependency slug**. Each value contains:
-
-- `integration`: the unique full commit with exact subject
-  `Implement change <dependency-slug>`, reachable from the selected baseline.
-- `sources`: nonempty mapping of consumer-required repository-relative source
-  paths to SHA-256 of their exact Git blob bytes at the selected baseline.
-- `checks`: nonempty array of scoped observations: `scope`, full tested
-  `revision`, `result: "passed"`, numeric `exit: 0`, relative `artifact` and its
-  `sha256`. Each tested revision must exist and contain the same required source
-  bytes. The artifact must be readable and match its digest.
-
-The operator must choose the sources, commands/results and scope from the
-consuming contract, including concrete tool/device gates when applicable.
-The runner verifies identity, integration, contents and reported results; it
-cannot certify arbitrary assertions or that a manually supplied artifact is
-truthful. Unknown/failed/missing evidence blocks with owner/action. This format
-does not implement publisher exceptions: unmet prerequisites require actual
-evidence or a separately authorized contract amendment. Deferred phone/account
-obligations assigned to later consumers are not invented as current gates.
-Historical review receipts/handoffs are not required. No prerequisite record is
-fabricated by start. Diagnostic observations in `mch-workflow-evidence/` remain
-immutable and separate; their review labels are not readiness authority.
-
-## Runtime, projection and recovery contract (schema 1)
-
-Private authoritative runtime: Git directory
-`codex-workflow-runs/<run-id>/state.json`; exclusive checkout OS lock:
-`codex-workflow-locks/checkout.lock`. Run IDs are `r-` followed by 32 lowercase
-hexadecimal characters. Runtime directories/files use private permissions.
-All preparation mutations in this checkout share one lock, even for different change slugs. Lock PID/host/time are diagnostics,
-not leases. Never delete a lock to steal ownership. A supervisor holds inherited
-ownership until active Git children exit, even after parent death. Plan dispatch
-locks and future S004 target merge locks are separate domains.
-
-State retains checkout identity, initial caller branch/source, configuration, full original baseline/source/target/intent
-commits, generation, UTC timestamps, phase/previous_phase/phase_result, blockers
-(reason/owner/next action), prerequisites, observations, artifacts and projection
-metadata. Supported phases: `preparing`, `prepared`, `blocked`, `interrupted`.
-Checks/reviews start empty, merge null, implementation/review/merge/requirement
-gates `unmet`, `run_complete: false`. Supported extension fields are retained;
-unsupported schema/later evidence/phase, old destination-based state without the required checkout/initial-branch fields, duplicate keys or corrupt JSON fail
-closed. Original baseline/configuration/identity cannot change on replacement.
-Generation comparison prevents stale replacement. Same-directory temporary
-write, checked full write/flush/fsync, atomic rename and directory fsync establish
-durability, including synchronization of newly created parent directories.
-Post-rename failure requires rereading disk; rollback is not assumed.
-
-Portable projection: existing checkout
-`agent/progress/runs/<run-id>.json`. Runtime holds SHA-256 of its exact bytes and
-the matching generation. Projection holds sanitized identity/commits, local-only
-checkout marker, mode/freshness and unmet gates, never raw logs, host paths,
-remote URLs or secrets. Runtime reserves the snapshot before publication; a
-crash between them is explicitly unreconciled, not prepared success. Pending
-publication has its own generation/digest; `prepared`/`passed` is persisted only
-after the portable bytes are durable. Only exact
-run-owned projection bytes (current digest or retained prior publication digest)
-are permitted bookkeeping dirt. A tampered or unrelated progress file blocks
-and is never overwritten. Nothing is automatically staged. Legacy
-`codex-plan-runs/*.tsv`, plan lock, raw output and observation receipts are
-preserved, not imported as passing gates.
-
-`status` is read-only: no fetch, repair or file/ref mutation; it reports an
-active owner, cached Git observations and pending reconciliation. A valid blocked
-inspection may return 0; that is not approval. `preflight` locks, rechecks
-prerequisites and refreshes the configured target, recording observations without
-creating missing Git setup. `resume` additionally reconciles recorded intent:
-create/select once only if the original caller branch/source is unchanged and the change branch is absent, or verify the selected branch/path/HEAD and
-finish publication after interruption. It never resets a baseline or restarts
-later phases. Changed source commits (even equal trees), changed target,
-changed checkout branch/path, configuration conflicts or ambiguous partial Git
-results block for operator/S004 reconciliation. Missing/corrupt runtime or legacy
-TSV alone cannot authorize resume. Inspect and preserve user work before any
-manual repair; never delete/reset a branch/checkout merely to retry start.
-
-JSON output separates `phase_result` from `run_complete: false`, naming run,
-slug, phase, baseline/source/target, blockers, next action and runtime/portable
-paths. Exit 0 means only the named phase/read passed; usage errors return 2,
-other failures 1, SIGINT 130, SIGTERM 143 after stopping active child work and
-best-effort interruption bookkeeping. SIGKILL can leave durable `preparing` or
-an unreconciled projection; explicitly resume, do not infer completion.
-
-## Bootstrap audit and S004 handoff
-
-S003 is preparation only; GW remains unmet until S004 proves the execution loop.
-Use **manual bootstrap** per agent/IMPLEMENT.md: verify baseline/dependencies,
-implement/check, separate full-diff review with durable finding dispositions,
-fix/recheck/re-review, then revalidate exact final source/target and serialize a
-direct squash into dev. The implementing skill does not commit/push/merge.
-
-Existing branch-create/create-change helpers switch the caller checkout and may
-initialize/publish release branches: not used here. `codex-plan-run.sh` retains
-queue TSV history and its outer plan lock, not a per-change gate ledger.
-`codex-flow-run.sh`, implementation/review launchers and Release.pm remain legacy
-helpers, not certified unattended IMPLEMENT delivery. S004 must wire this state
-and lock contract into bounded check/review/fix/retry/integration/merge recovery,
-safe staging and portable/PLAN publication. Progress.pm remains terminal-only;
-CodexSession.pm remains session extraction. No helper is deleted or silently
-relabeled conformant. Source/target drift invalidation cannot be bypassed by
-legacy success artifacts. Preparation tests do not prove app, SQLite, device,
-accuracy, publication or release gates.
-
-Independent deterministic checks (temporary Git repositories/local remotes,
-no live model or production remote):
-
-```shell
-perl scripts/test-unit-workflow-run-state.pl
-perl scripts/test-workflow-run-state.pl
-make workflow-test
-```

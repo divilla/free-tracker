@@ -21,7 +21,7 @@ E2E_PATHS = ['integration_test/app_info_test.dart', 'integration_test/app_info_p
             'integration_test/change_cases_test.dart']
 
 
-def machine_results(output, paths):
+def machine_results(output, paths, root=None):
     suites, tests, completed = {}, {}, {}
     success = False
     for line in output.splitlines():
@@ -43,7 +43,7 @@ def machine_results(output, paths):
         elif kind == 'error':
             raise ValueError('test reported error: ' + event.get('error', 'unknown'))
     counts = {p: 0 for p in paths}
-    names = []
+    names, executed = [], []
     if set(tests) != set(completed):
         raise ValueError('test execution did not complete every started case')
     for test_id, event in completed.items():
@@ -54,12 +54,16 @@ def machine_results(output, paths):
         test = tests[test_id]
         path = suites[test['suiteID']]
         names.append(test['name'])
+        relative = Path(path)
+        if relative.is_absolute() and root is not None:
+            relative = relative.relative_to(root)
+        executed.append({'file': relative.as_posix(), 'name': test['name']})
         for required in paths:
             if required in path:
                 counts[required] += 1
     if not success or any(n == 0 for n in counts.values()):
         raise ValueError('missing successful nonempty executed suite: ' + str(counts))
-    return {'counts': counts, 'tests': names}
+    return {'counts': counts, 'tests': names, 'executed': executed}
 
 
 class Runner:
@@ -118,9 +122,9 @@ class Runner:
                     raise ValueError('tooling suite empty, skipped or incomplete')
                 result['tooling_count'] = int(count[1])
                 output = self.command(['dart', 'test', '--reporter=json', *CORE_PATHS], reports / 'core.jsonl')
-                result['core'] = machine_results(output, CORE_PATHS)
+                result['core'] = machine_results(output, CORE_PATHS, self.root)
                 output = self.command(['flutter', 'test', '--coverage', '--machine', 'test'], reports / 'flutter.jsonl')
-                result['flutter'] = machine_results(output, UNIT_PATHS)
+                result['flutter'] = machine_results(output, UNIT_PATHS, self.root)
                 result['coverage'] = check_coverage.check(self.root, coverage)
                 check_scaffold.check(self.root)
             else:
@@ -137,7 +141,7 @@ class Runner:
                 result['suites'] = []
                 for index, path in enumerate(E2E_PATHS):
                     output = self.command(['flutter', 'test', '--machine', '-d', device, path], reports / f'android-{index}.jsonl')
-                    summary = machine_results(output, [path])
+                    summary = machine_results(output, [path], self.root)
                     required = ([f'S001_E{i:02}_' for i in range(1, 11)] if index == 0
                                 else ['S001_P01_'] if index == 1 else [])
                     if any(not any(n.startswith(prefix) for n in summary['tests']) for prefix in required):

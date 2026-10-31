@@ -9,9 +9,6 @@ end-to-end-test:
 
 # Deterministic tooling checks use temporary repositories, never live Codex/remotes.
 workflow-test:
-	perl scripts/test-unit-workflow-run-state.pl
-	perl scripts/test-workflow-run-state.pl
-	perl scripts/test-workflow-evidence.pl
 	perl scripts/test-unit-codex-code-implement.pl
 	perl scripts/test-unit-codex-review-loop.pl
 	perl scripts/test-unit-codex-change-write.pl

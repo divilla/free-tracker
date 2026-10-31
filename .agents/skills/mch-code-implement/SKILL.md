@@ -65,9 +65,7 @@ Do not commit or push; the caller handles commits.
    a predecessor's review/fix history or require its review receipts, delivery
    confirmation, or a synchronized handoff before starting dependent work.
    Handoffs and aggregate PLAN prose are dated context, not a second delivery
-   gate. When useful, `perl scripts/workflow-evidence.pl <dependency-slug>
-   <exact-dev-commit>` reports Git integration and optional diagnostic receipts;
-   unknown historical review/check statuses are not dependency blockers.
+   gate.
    Verify the current stage's concrete code/test/tool/device prerequisites;
    prior administrative delivery records are not additional prerequisites. Missing,
    failed or contradictory evidence for an actual prerequisite blocks dependent
@@ -140,10 +138,3 @@ files as zero lines.
 Declare completion only when every criterion is implemented and tested,
 contracts remain aligned, and required checks pass. Summarize the behavior,
 verification, and any remaining limitation with links to key files.
-
-When the caller sets `MCH_IMPLEMENTATION_OUTCOME_FILE`, write a JSON object there
-before returning, including when blocked before edits:
-`{"schema":1,"outcome":"complete|blocked|failed"}` (select one outcome).
-Use `complete` only after the completion conditions above are satisfied. This
-private caller-owned result is separate from the prose response and tracked
-files; do not commit it. Missing/malformed outcomes fail closed in the runner.

@@ -30,7 +30,6 @@ mkdir -p "$repo/scripts/lib/mch" "$repo/agent/changes" "$fake_bin"
 cp "$script_dir/codex-review-loop.pl" "$repo/scripts/codex-review-loop.pl"
 cp "$script_dir/lib/mch/Progress.pm" "$repo/scripts/lib/mch/Progress.pm"
 cp "$script_dir/lib/mch/CodexSession.pm" "$repo/scripts/lib/mch/"
-cp "$script_dir/lib/mch/WorkflowEvidence.pm" "$repo/scripts/lib/mch/"
 cp "$script_dir/lib/mch/GitAuth.pm" "$repo/scripts/lib/mch/GitAuth.pm"
 cp "$script_dir/git-auth.sh" "$repo/scripts/git-auth.sh"
 cp "$script_dir/test-lib/ssh-add" "$fake_bin/ssh-add"
@@ -51,7 +50,7 @@ git -C "$repo" config user.email 'review-loop@example.invalid'
 git -C "$repo" remote add origin "$remote"
 printf '%s\n' 'initial' >"$repo/initial.txt"
 git -C "$repo" add initial.txt scripts/codex-review-loop.pl \
-	scripts/lib/mch/Progress.pm scripts/lib/mch/CodexSession.pm scripts/lib/mch/GitAuth.pm scripts/lib/mch/WorkflowEvidence.pm scripts/git-auth.sh scripts/commit-agent.pl
+	scripts/lib/mch/Progress.pm scripts/lib/mch/CodexSession.pm scripts/lib/mch/GitAuth.pm scripts/git-auth.sh scripts/commit-agent.pl
 git -C "$repo" commit -q -m initial
 git -C "$repo" push -q -u origin master
 git -C "$repo" branch stage
@@ -347,9 +346,7 @@ grep -Fxq 'Applied all valid review findings.' "$output"
 awk '
 /^\[✅\]/ {
 	if ((getline session) <= 0 || session !~ /^Codex session ID: session-[0-9]+$/) exit 1
-	if ((getline blank) <= 0) exit 1
-	if (blank ~ /^Workflow evidence: / && (getline blank) <= 0) exit 1
-	if (blank != "") exit 1
+	if ((getline blank) <= 0 || blank != "") exit 1
 	completed++
 }
 /This finding contains .* as an example\.$/ { review_result = 1; next }
