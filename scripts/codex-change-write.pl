@@ -315,7 +315,7 @@ sub main {
 	print "\n=== Implementation ===\n";
 	my $prompt = '$mch-change-write';
 	my $status = run_codex(
-		'codex', 'exec', '--json', '--model', 'gpt-6.1-sol',
+		'codex', 'exec', '--json', '--model', 'gpt-6-astra',
 		'-c', 'model_reasoning_effort="high"', '-c', 'service_tier="default"',
 		'-o', $result_file, $prompt,
 	);

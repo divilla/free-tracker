@@ -446,6 +446,28 @@ progress line and the changed-file list, then commits and pushes the changes as
 `Implement code <slug>`. Temporary output stays outside the repository
 and is removed on exit.
 
+## Pi workflow variants
+
+`pi-code-implement.pl` invokes `$mch-code-implement` through `pi -p --mode
+json --thinking high --approve`, parses the final Pi assistant event, and keeps
+the same clean-tree, branch, result, commit, push, progress, failure, and
+interruption guarantees as the Codex implementation helper.
+
+`pi-review-loop.pl` keeps Codex for every `codex exec review` pass. Only a pass
+with findings hands those findings to `$mch-findings-fix` on stdin through
+`pi -p --mode json --thinking high --approve`. The loop parses Pi's final
+assistant event into its temporary fix-result file, reports the Pi session ID,
+and retains the same Codex review options, scope checks, commits, pushes, and
+re-review behavior as `codex-review-loop.pl`.
+
+Controlled Pi checks use fake Codex and Pi executables:
+
+```shell
+bash scripts/test-pi-code-implement.sh
+perl scripts/test-unit-pi-review-loop.pl
+bash scripts/test-pi-review-loop.sh
+```
+
 ## `codex-review-loop.pl`
 
 ### Review an authored change (default)
