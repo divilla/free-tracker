@@ -109,7 +109,7 @@ sub command {
         close $worker_write;
         sigprocmask(SIG_SETMASK, $oldmask);
         # Drain worker output even when the launcher has died. Otherwise its
-        # closed pipe could SIGPIPE Git into a partially created worktree.
+        # closed pipe could SIGPIPE Git into a partially created branch.
         my $forward = 1;
         while (1) {
             my $count = sysread($worker_read, my $buffer, 8192);
@@ -151,7 +151,7 @@ sub repository {
     my ($s) = @_;
     $s->fail('repository path unavailable') unless $s->{root};
     $s->{root} = abs_path($s->git('rev-parse', '--show-toplevel'));
-    $s->{common} = abs_path($s->git('rev-parse', '--path-format=absolute', '--git-common-dir'));
+    $s->{common} = abs_path($s->git('rev-parse', '--absolute-git-dir'));
     $s->fail('missing repository identity') unless $s->{common};
     $s->{repo_id} = sha256_hex($s->{common});
     $s->git('symbolic-ref', '--quiet', '--short', 'HEAD');
@@ -267,10 +267,10 @@ sub sync_directory {
 sub lock {
     my ($s, $slug) = @_;
     $s->directories("$s->{common}/codex-workflow-locks");
-    my $path = "$s->{common}/codex-workflow-locks/$slug.lock";
+    my $path = "$s->{common}/codex-workflow-locks/checkout.lock";
     $s->safe_path($path);
     sysopen my $fh, $path, O_RDWR | O_CREAT | O_NOFOLLOW, 0600 or $s->fail('cannot open ownership lock');
-    flock($fh, LOCK_EX | LOCK_NB) or $s->fail('change already has an active owner');
+    flock($fh, LOCK_EX | LOCK_NB) or $s->fail('checkout already has an active owner');
     fcntl($fh, F_SETFD, fcntl($fh, F_GETFD, 0) & ~FD_CLOEXEC) or $s->fail('cannot retain child ownership');
     $s->{lock} = $fh;
 }
@@ -286,7 +286,7 @@ sub state_path { "$_[0]{common}/codex-workflow-runs/$_[1]/state.json" }
 sub projection_path { "agent/progress/runs/$_[1].json" }
 sub validate_state {
     my ($s, $v) = @_;
-    for my $key (qw(schema generation run_id change_id slug branch change_path repository worktree config baseline source target intent phase previous_phase phase_result blockers next_action updated_utc created_utc checks reviews merge gates run_complete artifacts projection prerequisites observations)) {
+    for my $key (qw(schema generation run_id change_id slug branch change_path repository checkout initial_branch initial_source config baseline source target intent phase previous_phase phase_result blockers next_action updated_utc created_utc checks reviews merge gates run_complete artifacts projection prerequisites observations)) {
         $s->fail("missing state field $key") unless exists $v->{$key};
     }
     $s->fail('unsupported state schema/generation') unless $v->{schema} eq '1' && $v->{generation} =~ /^[1-9][0-9]*$/;
@@ -295,7 +295,9 @@ sub validate_state {
         && $v->{change_id} eq 'S' . (split /-/, $v->{slug})[0];
     $s->fail('repository identity conflict') unless ref $v->{repository} eq 'HASH'
         && ($v->{repository}{common} // '') eq $s->{common} && ($v->{repository}{id} // '') eq $s->{repo_id};
-    $s->safe_path($v->{worktree});
+    $s->fail('checkout identity conflict') unless $v->{checkout} eq $s->{root};
+    $s->fail('invalid initial branch') unless $v->{initial_branch} =~ /\S/;
+    $s->fail('invalid initial source') unless oid_ok($v->{initial_source});
     $s->fail('invalid state commits') if grep { !oid_ok($v->{$_}) } qw(baseline source target intent);
     $s->fail('invalid UTC timestamp') if grep { !defined $v->{$_} || $v->{$_} !~ /\A\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ\z/ } qw(updated_utc created_utc);
     $s->fail('invalid next action') unless defined $v->{next_action} && !ref $v->{next_action} && $v->{next_action} =~ /\S/;
@@ -310,7 +312,7 @@ sub validate_state {
     $s->fail('invalid gates') unless ref $v->{gates} eq 'HASH' && !grep { ($v->{gates}{$_} // '') ne 'unmet' } qw(implementation review merge requirement_validation);
     $s->fail('invalid gate approval') if grep { $_ ne 'unmet' } values %{$v->{gates}};
     $s->fail('invalid configuration') unless ref $v->{config} eq 'HASH' && ($v->{config}{target} // '') eq 'dev'
-        && ($v->{config}{mode} // '') =~ /\A(?:local|remote)\z/ && $v->{config}{worktree} eq $v->{worktree};
+        && ($v->{config}{mode} // '') =~ /\A(?:local|remote)\z/ && $v->{config}{checkout} eq $v->{checkout};
     if ($v->{config}{mode} eq 'remote') {
         $s->remote_ok($v->{config}{remote});
         $s->fail('invalid remote configuration identity') unless ($v->{config}{remote_identity} // '') =~ /\A[a-f0-9]{64}\z/;
@@ -376,7 +378,7 @@ sub save_state {
     if (defined $expected) {
         my $old = $s->read_state($v->{run_id});
         $s->fail('stale generation') unless $old->{generation} == $expected;
-        for (qw(run_id slug branch baseline intent worktree)) { $s->fail("immutable state changed: $_") unless $old->{$_} eq $v->{$_}; }
+        for (qw(run_id slug branch baseline intent checkout initial_branch initial_source)) { $s->fail("immutable state changed: $_") unless $old->{$_} eq $v->{$_}; }
         $s->fail('immutable configuration changed') unless json()->encode($old->{config}) eq json()->encode($v->{config});
         $s->fail('invalid phase transition') if $old->{phase} eq 'prepared' && $v->{phase} eq 'preparing';
     } else { $s->fail('runtime already exists') if -e $path; }
@@ -393,13 +395,13 @@ sub portable {
         baseline => $v->{baseline}, source => $v->{source}, target => $v->{target},
         phase => $v->{phase}, phase_result => $v->{phase_result}, run_complete => JSON::PP::false,
         gates => $v->{gates}, checks => [], reviews => [], merge => undef,
-        worktree => 'local/unavailable', mode => $v->{config}{mode},
+        checkout => 'local/unavailable', mode => $v->{config}{mode},
         remote_freshness => $v->{config}{mode} eq 'local' ? 'not checked' : 'observed',
         updated_utc => $v->{updated_utc}, next_action => $v->{phase} eq 'prepared' ? 'S004/manual bootstrap required' : 'Explicit resume/reconciliation required'});
 }
 sub projection_valid {
     my ($s, $v) = @_;
-    my $p = "$v->{worktree}/$v->{projection}{path}";
+    my $p = "$v->{checkout}/$v->{projection}{path}";
     return 0 unless -f $p && !-l $p && defined $v->{projection}{sha256}
         && ($v->{projection}{generation} // 0) == $v->{generation};
     my $bytes = $s->bytes($p);
@@ -419,7 +421,7 @@ sub publish {
         projection => { %{$v->{projection}}, pending_generation => $next->{generation}, pending_sha256 => $next->{projection}{sha256} } };
     $s->save_state($pending, $v->{generation}); %$v = %$pending;
     $s->hook('before-projection');
-    my $path = "$v->{worktree}/$v->{projection}{path}";
+    my $path = "$v->{checkout}/$v->{projection}{path}";
     if (-e $path) {
         # Only bytes published/declared by this run may be replaced. The caller
         # checks the old projection before reserving this next generation.
@@ -490,9 +492,7 @@ sub start {
         $s->remote_ok($config->{remote});
         $config->{remote_identity} = $s->remote_identity($config->{remote});
     }
-    my $dest = $s->safe_path(File::Spec->rel2abs($config->{worktree}));
-    $s->fail('worktree parent missing or destination exists') if !-d dirname($dest) || -e $dest;
-    $config->{worktree} = $dest; $config->{target} = 'dev';
+    $config->{checkout} = $s->{root}; $config->{target} = 'dev';
     $s->lock($slug);
     $s->branch_absent("change/$slug");
     for my $path (bsd_glob "$s->{common}/codex-workflow-runs/*/state.json") {
@@ -506,7 +506,8 @@ sub start {
     my $prereqs = $s->prerequisites($entry, $baseline);
     $s->hook('after-refresh');
     $s->clean($s->{root}); $s->branch_absent("change/$slug");
-    $s->fail('destination appeared during refresh') if -e $dest;
+    my $initial_branch = $s->git('symbolic-ref', '--quiet', '--short', 'HEAD');
+    my $initial_source = $s->commit('HEAD');
     my $id = 'r-' . substr(sha256_hex(join ':', $s->now, $$, rand(), $s->{common}, $slug), 0, 32);
     $s->directories("$s->{common}/codex-workflow-runs");
     mkdir "$s->{common}/codex-workflow-runs/$id", 0700 or $s->fail('exclusive run allocation failed');
@@ -514,7 +515,7 @@ sub start {
     $s->diagnostic($id);
     my $v = { schema => 1, generation => 1, run_id => $id, change_id => $entry->{id}, slug => $slug,
         branch => "change/$slug", change_path => $entry->{path}, repository => { id => $s->{repo_id}, common => $s->{common} },
-        worktree => $dest, config => $config, baseline => $baseline, source => $baseline, target => $baseline, intent => $baseline,
+        checkout => $s->{root}, initial_branch => $initial_branch, initial_source => $initial_source, config => $config, baseline => $baseline, source => $baseline, target => $baseline, intent => $baseline,
         phase => 'preparing', previous_phase => 'preparing', phase_result => 'pending', blockers => [],
         next_action => 'Explicit resume to reconcile preparation', updated_utc => $s->now, created_utc => $s->now,
         checks => [], reviews => [], merge => undef, gates => { map { $_ => 'unmet' } qw(implementation review merge requirement_validation) },
@@ -524,59 +525,34 @@ sub start {
             : {%{$s->{refresh_observation}}, target => $baseline}] };
     $s->{state} = $v;
     $s->hook('before-intent'); $s->save_state($v, undef); $s->hook('after-intent');
-    $s->create_worktree($v);
-    $s->clean($v->{worktree}, $v);
+    $s->create_branch($v);
+    $s->clean($v->{checkout}, $v);
     $s->publish($v);
     return $v;
 }
-sub worktrees {
-    my ($s) = @_;
-    my @trees;
-    for my $chunk (split /\0\0/, $s->git('worktree', 'list', '--porcelain', '-z')) {
-        my %t;
-        for (split /\0/, $chunk) { my ($k, $v) = split / /, $_, 2; $t{$k} = $v if defined $k; }
-        push @trees, \%t if $t{worktree};
-    }
-    return @trees;
-}
-sub create_worktree {
+# Preparation uses this checkout only. No destination or extra-checkout owner
+# exists: Git's selected branch and the run's original branch/source are enough.
+sub create_branch {
     my ($s, $v) = @_;
     $s->hook('before-git');
-    $s->git('worktree', 'add', '-b', $v->{branch}, '--', $v->{worktree}, $v->{intent});
+    $s->fail('caller branch/source changed before creation') unless
+        $s->git('symbolic-ref', '--quiet', '--short', 'HEAD') eq $v->{initial_branch}
+        && $s->commit('HEAD') eq $v->{initial_source};
+    $s->clean($s->{root}, $v, 1);
+    $s->git('checkout', '--no-overwrite-ignore', '-b', $v->{branch}, $v->{intent});
     $s->hook('after-git');
-    $s->verify_worktree($v, 1);
-    $s->claim_worktree($v);
+    $s->verify_checkout($v);
 }
-sub owner_path {
+sub verify_checkout {
     my ($s, $v) = @_;
-    return $s->git('-C', $v->{worktree}, 'rev-parse', '--absolute-git-dir') . '/codex-workflow-owner.json';
-}
-sub owner_bytes {
-    my ($s, $v) = @_;
-    return json()->encode({ schema => 1, run_id => $v->{run_id}, repository => $s->{repo_id}, branch => $v->{branch}, intent => $v->{intent}, worktree => $v->{worktree} });
-}
-sub claim_worktree {
-    my ($s, $v) = @_;
-    my $path = $s->owner_path($v);
-    if (-e $path) { $s->fail('worktree belongs to a different run') unless $s->bytes($path) eq $s->owner_bytes($v); return; }
-    $s->atomic($path, $s->owner_bytes($v));
-}
-sub verify_worktree {
-    my ($s, $v, $allow_missing_owner) = @_;
-    my @trees = grep { $_->{worktree} eq $v->{worktree} } $s->worktrees;
-    $s->fail('missing/moved/ambiguous worktree') unless @trees == 1 && -d $v->{worktree}
-        && ($trees[0]{branch} // '') eq "refs/heads/$v->{branch}";
-    my $actual = $s->git('-C', $v->{worktree}, 'rev-parse', 'HEAD');
+    $s->fail('checkout repository/branch identity conflict') unless $v->{checkout} eq $s->{root}
+        && $s->git('symbolic-ref', '--quiet', '--short', 'HEAD') eq $v->{branch};
+    my $actual = $s->commit('HEAD');
     if ($actual ne $v->{source}) {
         push @{$v->{observations}}, { source_old => $v->{source}, source_new => $actual, evidence_usable => JSON::PP::false };
         $s->fail('source drift; S004 integration/revalidation required');
     }
-    $s->fail('worktree repository/branch identity conflict') unless abs_path($s->git('-C', $v->{worktree}, 'rev-parse', '--path-format=absolute', '--git-common-dir')) eq $s->{common}
-        && $s->git('-C', $v->{worktree}, 'symbolic-ref', '--short', 'HEAD') eq $v->{branch};
-    $s->inventory($v->{slug}, $v->{worktree});
-    my $owner = $s->owner_path($v);
-    if (-e $owner) { $s->fail('worktree owner identity conflict') unless $s->bytes($owner) eq $s->owner_bytes($v); }
-    else { $s->fail('worktree ownership marker missing; manual reconciliation required') unless $allow_missing_owner; }
+    $s->inventory($v->{slug});
 }
 sub reconcile {
     my ($s, $v, $resume) = @_;
@@ -587,8 +563,7 @@ sub reconcile {
     my $entry = $s->inventory($v->{slug});
     $s->fail('configured remote identity changed') if $v->{config}{mode} eq 'remote'
         && $s->remote_identity($v->{config}{remote}) ne ($v->{config}{remote_identity} // '');
-    # Caller worktree can be different from prepared worktree. Inspect both.
-    $s->clean($s->{root}, $s->{root} eq $v->{worktree} ? $v : undef, $resume);
+    $s->clean($s->{root}, $v, $resume);
     my $prerequisites = $s->prerequisites($entry, $v->{baseline});
     $s->fail('effective prerequisite configuration changed') unless json()->encode($prerequisites) eq json()->encode($v->{prerequisites});
     my $target = $s->target($v->{config}, $v);
@@ -596,18 +571,19 @@ sub reconcile {
         push @{$v->{observations}}, { target_old => $v->{target}, target_new => $target, evidence_usable => JSON::PP::false };
         $s->fail('target drift; S004 integration/revalidation required');
     }
-    $s->clean($s->{root}, $s->{root} eq $v->{worktree} ? $v : undef, $resume);
-    my @owned = grep { $_->{worktree} eq $v->{worktree} || ($_->{branch} // '') eq "refs/heads/$v->{branch}" } $s->worktrees;
-    if (!@owned && !-e $v->{worktree} && $v->{previous_phase} eq 'preparing' && $v->{phase} ne 'prepared') {
+    $s->clean($s->{root}, $v, $resume);
+    my $selected = $s->git('symbolic-ref', '--quiet', '--short', 'HEAD');
+    if ($selected ne $v->{branch}) {
+        $s->fail('checkout branch changed; manual reconciliation required') unless $v->{previous_phase} eq 'preparing'
+            && $v->{phase} ne 'prepared' && $selected eq $v->{initial_branch}
+            && $s->commit('HEAD') eq $v->{initial_source};
         $s->branch_absent($v->{branch});
         $s->fail('creation pending; use explicit resume') unless $resume;
-        $s->create_worktree($v);
+        $s->create_branch($v);
     } else {
-        my $claim = $resume && $v->{previous_phase} eq 'preparing' && $v->{phase} ne 'prepared';
-        $s->verify_worktree($v, $claim);
-        $s->claim_worktree($v) if $claim;
+        $s->verify_checkout($v);
     }
-    $s->clean($v->{worktree}, $v, $resume);
+    $s->clean($v->{checkout}, $v, $resume);
     if ($s->projection_valid($v) && $v->{phase} eq 'prepared') {
         push @{$v->{observations}}, { operation => $resume ? 'resume' : 'preflight', observed_utc => $s->now, source => $v->{source}, target => $target };
         $s->publish($v);
@@ -619,7 +595,7 @@ sub reconcile {
 }
 sub status {
     my ($s, $v) = @_;
-    my $path = "$s->{common}/codex-workflow-locks/$v->{slug}.lock";
+    my $path = "$s->{common}/codex-workflow-locks/checkout.lock";
     my $active = 0;
     if (-e $path) {
         $s->safe_path($path);
@@ -631,23 +607,25 @@ sub status {
     my ($source, $target, $git_error);
     eval { $source = $s->commit("refs/heads/$v->{branch}"); $target = $s->commit($v->{config}{mode} eq 'local' ? 'refs/heads/dev' : "refs/remotes/$v->{config}{remote}/dev"); 1 } or $git_error = 'Git observation unavailable';
     my $drift = $git_error || ($source // '') ne $v->{source} || ($target // '') ne $v->{target};
-    my $worktree_ok = eval { $s->verify_worktree($v); 1 };
+    my $checkout_ok = eval { $s->verify_checkout($v); 1 };
+    my $clean = eval { $s->clean($s->{root}, $v); 1 };
     return { %$v, inspection => { active_writer => $active ? JSON::PP::true : JSON::PP::false,
         source_observed => $source, target_cached_observed => $target, git_error => $git_error,
-        worktree_consistent => $worktree_ok ? JSON::PP::true : JSON::PP::false,
+        checkout_clean => $clean ? JSON::PP::true : JSON::PP::false,
+        checkout_consistent => $checkout_ok ? JSON::PP::true : JSON::PP::false,
         projection_consistent => $projection ? JSON::PP::true : JSON::PP::false,
-        reconciliation_required => $active || !$projection || $drift || !$worktree_ok || $v->{phase} ne 'prepared' ? JSON::PP::true : JSON::PP::false } };
+        reconciliation_required => $active || !$projection || $drift || !$checkout_ok || !$clean || $v->{phase} ne 'prepared' ? JSON::PP::true : JSON::PP::false } };
 }
 sub report {
     my ($s, $v) = @_;
     return { map({ $_ => $v->{$_} } qw(run_id slug phase phase_result run_complete baseline source target blockers next_action)),
-        runtime => $s->state_path($v->{run_id}), portable => "$v->{worktree}/$v->{projection}{path}",
+        runtime => $s->state_path($v->{run_id}), portable => "$v->{checkout}/$v->{projection}{path}",
         (exists $v->{inspection} ? (inspection => $v->{inspection}) : ()) };
 }
 sub cli {
     my ($s, @args) = @_;
     my ($op, $slug, %config, $id);
-    my $usage = "usage: workflow-run.pl start <slug> --worktree <new-path> (--local | --remote <name>); status|preflight|resume --run <run-id>\n";
+    my $usage = "usage: workflow-run.pl start <slug> (--local | --remote <name>); status|preflight|resume --run <run-id>\n";
     $op = shift @args // '';
     if ($op eq 'start') {
         $slug = shift @args;
@@ -655,10 +633,9 @@ sub cli {
             my $key = shift @args;
             if ($key eq '--local' && !exists $config{mode}) { $config{mode} = 'local'; }
             elsif ($key eq '--remote' && !exists $config{mode} && @args) { $config{mode} = 'remote'; $config{remote} = shift @args; }
-            elsif ($key eq '--worktree' && !exists $config{worktree} && @args) { $config{worktree} = shift @args; }
             else { print STDERR $usage; return 2; }
         }
-        unless (slug_ok($slug) && $config{mode} && defined $config{worktree} && $config{worktree} !~ /^-/) { print STDERR $usage; return 2; }
+        unless (slug_ok($slug) && $config{mode}) { print STDERR $usage; return 2; }
     } elsif ($op =~ /\A(?:status|preflight|resume)\z/ && @args == 2 && $args[0] eq '--run' && run_ok($args[1])) { $id = $args[1]; }
     else { print STDERR $usage; return 2; }
     my $signal;

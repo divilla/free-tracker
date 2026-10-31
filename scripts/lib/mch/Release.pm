@@ -115,7 +115,7 @@ sub pull_master {
 }
 
 sub ensure_release_branches {
-    # Callers check the worktree and authentication before any branch creation.
+    # Callers check the checkout and authentication before any branch creation.
     my $heads = capture(qw(git ls-remote --heads origin refs/heads/dev refs/heads/stage refs/heads/master));
     my %remote;
     for my $line (split /\n/, $heads) {
@@ -146,7 +146,7 @@ sub ensure_release_branches {
             run('git', 'update-ref', "refs/heads/$backup", $local{$branch});
             print "Preserved local $branch as $backup before initializing from the release baseline\n";
             if (capture(qw(git branch --show-current)) eq $branch) {
-                # Keep the index and worktree consistent when initializing the
+                # Keep the index and checkout consistent when initializing the
                 # checked-out branch; its previous contents remain in backup.
                 run('git', 'checkout', '--quiet', '--detach', $local{$branch});
                 run('git', 'branch', '-f', $branch, $start);

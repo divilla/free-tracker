@@ -10,7 +10,7 @@ fail() {
 	exit 1
 }
 
-ensure_clean_worktree() {
+ensure_clean_checkout() {
 	local changes
 	changes=$(git status --porcelain=v1 --untracked-files=all --ignore-submodules=none)
 	if [[ -n "$changes" ]]; then
@@ -37,9 +37,9 @@ else
     fail "invalid slug - doesn't match pattern: $pattern"
 fi
 
-ensure_clean_worktree
+ensure_clean_checkout
 git fetch --prune origin 1>&2
-ensure_clean_worktree
+ensure_clean_checkout
 
 perl -I "$script_dir/lib" -Mmch::Release=run_cli,ensure_release_branches \
 	-e 'run_cli(sub { ensure_release_branches() })' 1>&2
@@ -59,5 +59,5 @@ else
 fi
 
 git checkout -b "$branch" origin/dev 1>&2
-ensure_clean_worktree
+ensure_clean_checkout
 printf '%s\n' "$branch"

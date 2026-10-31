@@ -172,7 +172,7 @@ CODEX_TEST_WRITE=1 CODEX_TEST_WRITE_CONTENT='# Commit fails' run_change 1
 [[ $(git --git-dir="$test_root/origin.git" rev-parse refs/heads/change/000-domain-types) == "$initial_head" ]]
 [[ $(git -C "$repo" status --short) == 'M  agent/PLAN.md' ]]
 
-# Existing dirty-worktree guard remains in force.
+# Existing dirty-checkout guard remains in force.
 run_change 1
 grep -Fxq 'error: Uncommitted work detected. Commit or stash your changes, then retry.' "$test_root/error"
 printf '%s\n' 'codex-change-write integration tests passed'

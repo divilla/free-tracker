@@ -14,7 +14,6 @@ my $hook = sub {
     return unless defined $boundary && $event eq $boundary && !$fired++;
     if ($action eq 'fail') { die "injected $boundary\n"; }
     if ($action eq 'kill') { kill 'KILL', $$; }
-    if ($action eq 'path') { mkdir $ENV{WORKFLOW_E2E_DEST}; }
     if ($action eq 'dirty') { open my $f,'>',"$ENV{WORKFLOW_E2E_ROOT}/user-file" or die $!; print {$f} 'protected'; close $f; }
     if ($action eq 'stale') {
         my $file = $s->state_path($s->{state}{run_id});

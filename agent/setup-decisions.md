@@ -224,7 +224,7 @@ Final verification summary: `make unit-test` started at 2026-10-30 21:49:00 UTC
 and exited 0. The runner's SHA-256 inventories app/test/build/tool files, not docs;
 the setup payload hash above covers this document before `## Checks and handoff`
 (the evidence table itself is excluded to avoid a self-referential hash). All
-checks ran at the recorded HEAD plus the implementation worktree, not a new commit.
+checks ran at the recorded HEAD plus the implementation checkout, not a new commit.
 The unchanged S001 application retains 103/103 covered executable lines; its pure
 abstract port and exact generator-owned exclusions remain unchanged. Python tooling
 has mapped normal/error/boundary tests; no app coverage exception was added.
@@ -263,7 +263,7 @@ and field. Unterminated block comments fail closed. Five new `S002_T05_R08` test
 methods cover those cases, valid inline comments and read-only behavior.
 
 Checks on HEAD `6510be4d9760efbbba67f3369fa063ccebf6d3d2` plus this review-fix
-worktree: `python3 -m unittest discover -s tool/tests -v` passed all 68 tests;
+checkout: `python3 -m unittest discover -s tool/tests -v` passed all 68 tests;
 `python3 tool/check_scaffold.py` and `git diff --check` passed. `make unit-test`
 exited 2 at `flutter gen-l10n`: the SDK cache under `/home/vito/flutter` is
 read-only. No fresh Dart coverage or app-suite pass is claimed. Android E2E and
@@ -285,7 +285,7 @@ assignments, qualified and same-line calls, comment/whitespace variants, and
 non-executable examples, with field/path diagnostics and read-only assertions.
 
 Checks on HEAD `50afec530567b6007af7f1c2177d1ca8986449b4` plus this review-fix
-worktree: the new rejection regression failed before the code fix and passed
+checkout: the new rejection regression failed before the code fix and passed
 after it; `python3 -m unittest discover -s tool/tests -v` passed all 70 tests;
 `python3 tool/check_scaffold.py` and `git diff --check` passed. `make unit-test`
 exited 2 at `flutter gen-l10n` because `/home/vito/flutter/bin/cache` is read-only;

@@ -6,7 +6,7 @@
 
 [PLAN.md](PLAN.md) drives delivery of the entire app through bounded, dependency-ordered changes in `agent/changes/`. This document defines how each change is implemented, verified, reviewed, and merged.
 
-Repository scripts in `scripts/` must execute the workflow: branch/worktree setup, code implementation, checks, commits, PR-style reviews, fixes, and squash-merge into `dev`. Scripts may invoke coding/review agents and development tools; the scripts own sequencing, durable state, and gate enforcement. Agent prose alone must not advance a machine-verified gate. Existing entry points are documented in [scripts/README.md](../scripts/README.md); their presence does not establish full workflow conformance.
+Repository scripts in `scripts/` must execute the workflow: branch setup in the existing checkout, code implementation, checks, commits, PR-style reviews, fixes, and squash-merge into `dev`. Scripts may invoke coding/review agents and development tools; the scripts own sequencing, durable state, and gate enforcement. Agent prose alone must not advance a machine-verified gate. Existing entry points are documented in [scripts/README.md](../scripts/README.md); their presence does not establish full workflow conformance.
 
 The governing inputs are:
 
@@ -69,7 +69,7 @@ baseline at resume time. A working environment does not satisfy app-test or
 delivery gates; unavailable Make suites remain failed/unmet checks.
 
 1. Verify prerequisites, change readiness, available tools/devices, and dependency completion. Establish the current `dev` baseline, refreshing from the configured remote when applicable. Record its exact commit; do not silently use a stale baseline after a refresh failure.
-2. Create `change/<slug>` from that baseline, preferably in an isolated worktree. Preserve unrelated user changes. An existing branch/run must be explicitly recognized as a resume, not overwritten or reset.
+2. Create `change/<slug>` from that baseline in the existing checkout. Factory execution uses one checkout; do not create or manage additional linked checkouts. Preserve unrelated user changes. An existing branch/run must be explicitly recognized as a resume, not overwritten or reset.
 3. Implement the change, its tests, and necessary documentation. Integration here means wiring the change into the existing app on the feature branch; it does not yet mean merging into `dev`.
 4. Run required checks and repair failures. Commit the validated implementation to the feature branch with the change ID in the message.
 

@@ -235,12 +235,6 @@ done
 [[ -e $PLAN_TEST_READY ]]
 reject 1
 grep -q 'another plan run is active' "$test_root/error"
-git -C "$repo" worktree add -q -b linked "$test_root/linked worktree"
-status=0
-PLAN_TEST_REPO="$test_root/linked worktree" bash "$test_root/linked worktree/scripts/codex-plan-run.sh" \
-	>"$test_root/linked-output" 2>"$test_root/linked-error" || status=$?
-[[ $status -eq 1 && ! -s $PLAN_TEST_CALLS ]]
-grep -q 'another plan run is active' "$test_root/linked-error"
 kill -TERM "$runner_pid"
 status=0
 wait "$runner_pid" || status=$?

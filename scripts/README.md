@@ -177,7 +177,7 @@ lease requiring the branch to be absent, so it cannot overwrite a branch another
 writer creates concurrently. Restricted fetch configurations are handled using
 explicit refspecs when needed.
 
-Missing dev or stage branches are normal setup conditions, not errors. Worktree
+Missing dev or stage branches are normal setup conditions, not errors. Checkout
 and authentication checks still run first. Actual Git failures still stop the
 workflow. `origin/master` remains required whenever branch initialization is
 needed, and as the destination for production promotion.
@@ -273,7 +273,7 @@ perl scripts/test-merge-to-dev.pl
 perl scripts/test-promote-to-stage.pl
 perl scripts/test-promote-to-prod.pl
 perl scripts/test-git-auth.pl
-perl scripts/test-worktree.pl
+perl scripts/test-clean-checkout.pl
 perl scripts/test-release-branches.pl
 bash scripts/test-create-change-branch.sh
 ```
@@ -296,14 +296,14 @@ queue is snapshotted at startup; later inventory changes require a new invocatio
 No change documents need to exist in advance. Bash 4+, Perl, Git, `flock` and
 `setsid` (util-linux) are required to execute, along with the per-change tools.
 The runner works from any directory, requires a clean committed checkout, and
-serializes plan invocations across the repository's linked worktrees.
+serializes plan invocations in the existing checkout.
 
 The first workflow failure stops execution and preserves its exit status.
 There are no retries or automatic skips. Each invocation records queued,
 started, succeeded, failed or interrupted changes, timestamps, branch/commit,
-observed `origin/dev` and plan hash in a TSV file under the worktree's
+observed `origin/dev` and plan hash in a TSV file under the checkout's
 Git metadata directory, `codex-plan-runs/`; its exact path is printed at startup.
-The common Git directory holds `codex-plan-run.lock`. These files survive branch
+The Git directory holds `codex-plan-run.lock`. These files survive branch
 switches and are not staged by the workflow. SIGINT/SIGTERM stops the active
 workflow process group and records an interruption (exit 130/143). Interactive
 Codex recovery retains its controlling terminal; piped standard input is also
@@ -338,7 +338,7 @@ bash scripts/test-codex-plan-run.sh
 
 The `PLAN-RUN-*` cases cover all 25 slugs, working directories, preview/restart,
 first/middle/last failure, invalid inventories, durable progress, dirty/missing
-prerequisites, concurrent invocations (including linked worktrees), interruption
+prerequisites, concurrent invocations in the same checkout, interruption
 and interactive/piped input. These infrastructure checks do not substitute for
 unavailable app unit, SQLite, E2E or device tests.
 
@@ -411,7 +411,7 @@ of required behavior or device/product validation. Old handoff `not run` notes
 and missing historical receipts are not additional downstream delivery gates;
 no replacement handoff or publisher confirmation is required.
 
-Read-only optional diagnostics, from the repository/worktree:
+Read-only optional diagnostics, from the repository/checkout:
 
 ```shell
 perl scripts/workflow-evidence.pl 002-setup-decisions dev
@@ -428,7 +428,7 @@ integration or become downstream prerequisites. Missing required code/contracts
 or current-stage validation still block, with a concrete requirement/reason.
 
 The implementation/review/merge helpers now append private schema-1 JSON
-observations beneath `git rev-parse --git-common-dir`, in
+observations beneath `git rev-parse --absolute-git-dir`, in
 `mch-workflow-evidence/<slug>/<unique-observation>/receipt.json`. They retain
 responses, exact source/tree/baseline where applicable, review mode/pass/outcome,
 implementation command outcome and any available app check-summary contents,
@@ -436,7 +436,7 @@ and the verified published merge SHA. Check reports retain their own revision
 and dirty-content digest; presence/model prose does not certify them. Inspect
 scope and content identity before using a report as check evidence. Temporary
 output can be removed without losing these observations. They remain local,
-are shared across linked worktrees, are not automatically staged/pushed, and
+survive branch switches in the existing checkout, are not automatically staged/pushed, and
 must be explicitly archived for portability. Missing observations for older
 runs need no backfill. Interrupted observations stay incomplete; malformed or
 conflicting receipts produce explicit diagnostic errors and unverified review
@@ -644,8 +644,8 @@ its captured output is printed to standard error for diagnosis.
 From **any working directory**, use the script's actual repository path:
 
 ```shell
-perl scripts/workflow-run.pl start 004-workflow-review-merge --worktree /new/path --local
-perl scripts/workflow-run.pl start 004-workflow-review-merge --worktree /new/path --remote origin
+perl scripts/workflow-run.pl start 004-workflow-review-merge --local
+perl scripts/workflow-run.pl start 004-workflow-review-merge --remote origin
 perl scripts/workflow-run.pl status --run r-0123456789abcdef0123456789abcdef
 perl scripts/workflow-run.pl preflight --run r-0123456789abcdef0123456789abcdef
 perl scripts/workflow-run.pl resume --run r-0123456789abcdef0123456789abcdef
@@ -665,12 +665,13 @@ Resume binds the effective remote URL by a private digest, never the URL itself;
 changed remote configuration blocks before fetching.
 No release branches are initialized; no remote refs are written.
 
-Start requires a clean caller checkout (including hidden untracked files and
-dirty submodules), a unique exact PLAN/change identity, absent change branch/run
-and nonexistent destination with a real existing parent. It never resets,
-stashes, switches, stages, commits, pushes, invokes Codex or dispatches a legacy
-flow. It creates only `change/<slug>` and its isolated worktree. Non-forcing
-checks repeat after refresh. Symlink/traversal destinations are rejected.
+Start requires a clean existing checkout (including hidden untracked files and
+dirty submodules), a unique exact PLAN/change identity and absent change branch/run.
+It creates and selects `change/<slug>` in this checkout at the selected baseline,
+using non-forcing `git checkout --no-overwrite-ignore -b`. No destination option,
+additional checkout or destination-owner record exists. It never resets, stashes,
+stages, commits, pushes, invokes Codex or dispatches a legacy flow. Non-forcing
+checks repeat after refresh. Ignored files are not overwritten.
 
 ## Prerequisite evidence representation (schema 1)
 
@@ -703,36 +704,32 @@ immutable and separate; their review labels are not readiness authority.
 
 ## Runtime, projection and recovery contract (schema 1)
 
-Private authoritative runtime: common Git directory
-`codex-workflow-runs/<run-id>/state.json`; per-change stable OS lock:
-`codex-workflow-locks/<slug>.lock`. Run IDs are `r-` followed by 32 lowercase
+Private authoritative runtime: Git directory
+`codex-workflow-runs/<run-id>/state.json`; exclusive checkout OS lock:
+`codex-workflow-locks/checkout.lock`. Run IDs are `r-` followed by 32 lowercase
 hexadecimal characters. Runtime directories/files use private permissions.
-Linked worktrees share identity and locks. Lock PID/host/time are diagnostics,
+All preparation mutations in this checkout share one lock, even for different change slugs. Lock PID/host/time are diagnostics,
 not leases. Never delete a lock to steal ownership. A supervisor holds inherited
 ownership until active Git children exit, even after parent death. Plan dispatch
 locks and future S004 target merge locks are separate domains.
-Each prepared worktree's Git administration directory also retains a private
-`codex-workflow-owner.json` binding run/repository/branch/intent/path. A changed
-or missing established owner blocks. Only an explicit resume of initial creation
-intent may finish a missing marker after verifying the exact Git outcome.
 
-State retains identity/configuration, full original baseline/source/target/intent
+State retains checkout identity, initial caller branch/source, configuration, full original baseline/source/target/intent
 commits, generation, UTC timestamps, phase/previous_phase/phase_result, blockers
 (reason/owner/next action), prerequisites, observations, artifacts and projection
 metadata. Supported phases: `preparing`, `prepared`, `blocked`, `interrupted`.
 Checks/reviews start empty, merge null, implementation/review/merge/requirement
 gates `unmet`, `run_complete: false`. Supported extension fields are retained;
-unsupported schema/later evidence/phase, duplicate keys or corrupt JSON fail
+unsupported schema/later evidence/phase, old destination-based state without the required checkout/initial-branch fields, duplicate keys or corrupt JSON fail
 closed. Original baseline/configuration/identity cannot change on replacement.
 Generation comparison prevents stale replacement. Same-directory temporary
 write, checked full write/flush/fsync, atomic rename and directory fsync establish
 durability, including synchronization of newly created parent directories.
 Post-rename failure requires rereading disk; rollback is not assumed.
 
-Portable projection: prepared worktree
+Portable projection: existing checkout
 `agent/progress/runs/<run-id>.json`. Runtime holds SHA-256 of its exact bytes and
 the matching generation. Projection holds sanitized identity/commits, local-only
-worktree marker, mode/freshness and unmet gates, never raw logs, host paths,
+checkout marker, mode/freshness and unmet gates, never raw logs, host paths,
 remote URLs or secrets. Runtime reserves the snapshot before publication; a
 crash between them is explicitly unreconciled, not prepared success. Pending
 publication has its own generation/digest; `prepared`/`passed` is persisted only
@@ -748,13 +745,13 @@ active owner, cached Git observations and pending reconciliation. A valid blocke
 inspection may return 0; that is not approval. `preflight` locks, rechecks
 prerequisites and refreshes the configured target, recording observations without
 creating missing Git setup. `resume` additionally reconciles recorded intent:
-create once if no Git effect exists, or verify the owned branch/path/HEAD and
+create/select once only if the original caller branch/source is unchanged and the change branch is absent, or verify the selected branch/path/HEAD and
 finish publication after interruption. It never resets a baseline or restarts
 later phases. Changed source commits (even equal trees), changed target,
-missing/moved worktrees, configuration conflicts or ambiguous partial Git
+changed checkout branch/path, configuration conflicts or ambiguous partial Git
 results block for operator/S004 reconciliation. Missing/corrupt runtime or legacy
 TSV alone cannot authorize resume. Inspect and preserve user work before any
-manual repair; never delete/reset a branch/worktree merely to retry start.
+manual repair; never delete/reset a branch/checkout merely to retry start.
 
 JSON output separates `phase_result` from `run_complete: false`, naming run,
 slug, phase, baseline/source/target, blockers, next action and runtime/portable

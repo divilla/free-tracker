@@ -16,7 +16,6 @@ class WorkflowE2E(SystemCase):
     def setUp(self):
         super().setUp()
         self.slug='003-workflow-run-state'
-        self.dest=self.base/'prepared worktree'
         self.git('init','-q','-b','dev')
         self.git('config','user.name','System test')
         self.git('config','user.email','system@example.invalid')
@@ -31,7 +30,7 @@ class WorkflowE2E(SystemCase):
             self.write(name,(REPO/name).read_text())
         self.baseline=self.commit('fixture')
         self.git('push','-q','origin','dev')
-        self.env.update(WORKFLOW_E2E_ROOT=str(self.root),WORKFLOW_E2E_DEST=str(self.dest))
+        self.env.update(WORKFLOW_E2E_ROOT=str(self.root))
 
     def git(self,*args,cwd=None,ok=True):
         return self.command(['git',*args],cwd=cwd,ok=ok).stdout.strip()
@@ -49,12 +48,12 @@ class WorkflowE2E(SystemCase):
         return result
 
     def start(self,ok=True,fault='',remote=False):
-        return self.cli('start',self.slug,'--worktree',str(self.dest),
+        return self.cli('start',self.slug,
                         *(['--remote','origin'] if remote else ['--local']),ok=ok,fault=fault)
 
     def state(self): return json.loads(self.state_file.read_text())
     def resume(self,ok=True,fault=''): return self.cli('resume','--run',self.run_id,ok=ok,fault=fault)
-    def projection(self): return self.dest/self.state()['projection']['path']
+    def projection(self): return self.root/self.state()['projection']['path']
 
     def dependencies(self):
         deps={}
@@ -79,28 +78,28 @@ class WorkflowE2E(SystemCase):
     def test_S003_T01_e2e(self):
         self.start()
         self.assertEqual(self.state()['branch'],'change/'+self.slug)
-        self.assertEqual(self.git('rev-parse','HEAD',cwd=self.dest),self.baseline)
+        self.assertEqual(self.git('rev-parse','HEAD',cwd=self.root),self.baseline)
 
     def test_S003_T02_e2e(self):
         for slug in ('3-short','../003-escape','003-UPPER',''):
-            self.cli('start',slug,'--worktree',str(self.dest),'--local',ok=False)
+            self.cli('start',slug,'--local',ok=False)
         self.git('checkout','--detach','-q')
-        self.start(ok=False); self.assertFalse(self.dest.exists())
+        self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
 
     def test_S003_T03_e2e(self):
         plan=self.root/'agent/PLAN.md'; original=plan.read_text()
         for invalid in ('',original+original,original.replace('S003 /','S004 /')):
-            plan.write_text(invalid); self.start(ok=False); self.assertFalse(self.dest.exists())
+            plan.write_text(invalid); self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
         plan.write_text(original)
 
     def test_S003_T04_e2e(self):
         for name in ('AGENTS.md','agent/PRD.md','agent/ARCHITECTURE.md','agent/IMPLEMENT.md','agent/changes/'+self.slug+'.md'):
             file=self.root/name; original=file.read_text(); file.unlink()
-            self.start(ok=False); self.assertFalse(self.dest.exists()); file.write_text(original)
+            self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),''); file.write_text(original)
 
     def test_S003_T05_e2e(self):
         for args in ([],['wat'],['status','--run','../escape'],['start',self.slug],
-                     ['start',self.slug,'--worktree',str(self.dest),'--local','--remote','origin']):
+                     ['start',self.slug,'--local','--remote','origin']):
             self.assertEqual(self.cli(*args,ok=False).returncode,2)
 
     def test_S003_T06_e2e(self):
@@ -108,7 +107,7 @@ class WorkflowE2E(SystemCase):
         for field in ('scope','revision','result'):
             invalid=copy.deepcopy(value); del invalid['dependencies']['002-dependency']['checks'][0][field]
             self.manifest.write_text(json.dumps(invalid)); self.commit('invalid required evidence')
-            self.start(ok=False); self.assertFalse(self.dest.exists())
+            self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
 
     def test_S003_T07_e2e(self):
         self.dependencies()
@@ -117,7 +116,7 @@ class WorkflowE2E(SystemCase):
         self.start(); self.assertEqual(len(self.state()['prerequisites']),2)
 
     def test_S003_T08_e2e(self):
-        self.cli('start',self.slug,'--worktree',str(self.dest),'--local',cwd=self.base)
+        self.cli('start',self.slug,'--local',cwd=self.base)
         self.assertEqual(self.state()['baseline'],self.baseline)
         self.assertIn('not checked',self.state()['observations'][0]['operation'])
 
@@ -132,20 +131,34 @@ class WorkflowE2E(SystemCase):
     def test_S003_T10_e2e(self):
         self.git('remote','set-url','origin',str(self.base/'absent-origin'))
         self.start(ok=False,remote=True)
-        self.assertFalse(self.dest.exists())
+        self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
         self.assertEqual(self.git('rev-parse','dev'),self.baseline)
 
     def test_S003_T11_e2e(self):
         self.git('branch','-m','not-dev')
-        self.start(ok=False); self.assertFalse(self.dest.exists())
+        self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
 
     def test_S003_T12_e2e(self):
-        refs=self.git('show-ref'); self.start()
-        self.assertEqual(self.git('branch','--show-current'),'dev')
+        self.write('asset.private','baseline asset')
+        self.git('add','-f','asset.private'); self.git('commit','-qm','baseline asset')
+        self.write('.gitignore','*.private\n'); self.baseline=self.commit('ignore private assets')
+        self.git('checkout','-qb','caller')
+        self.git('rm','-q','asset.private'); self.git('commit','-qm','caller without asset')
+        self.write('asset.private','protected ignored data')
+        refs=self.git('show-ref'); selected=self.git('branch','--show-current')
+        self.start(ok=False)
+        self.assertEqual(self.git('show-ref'),refs)
+        self.assertEqual(self.git('branch','--show-current'),selected)
+        self.assertEqual((self.root/'asset.private').read_text(),'protected ignored data')
+        (self.root/'asset.private').unlink()
+        # The failed phase preserves its intent; explicit resume retries only
+        # after the caller resolves the conflicting file.
+        self.resume()
+        self.assertEqual(self.git('branch','--show-current'),'change/'+self.slug)
         self.assertEqual(self.git('rev-parse','HEAD'),self.baseline)
         self.assertEqual(self.git('diff','--cached','--name-only'),'')
         self.assertIn(refs.splitlines()[0],self.git('show-ref'))
-        self.assertEqual(len(self.git('worktree','list','--porcelain').split('worktree '))-1,2)
+        self.assertFalse((self.root/'.git/worktrees').exists())
 
     def test_S003_T13_e2e(self):
         self.write('.hidden','protected')
@@ -154,12 +167,14 @@ class WorkflowE2E(SystemCase):
         self.assertEqual((self.root/'.hidden').read_text(),'protected')
 
     def test_S003_T14_e2e(self):
-        self.dest.mkdir(); (self.dest/'user').write_text('preserved')
-        self.start(ok=False); self.assertEqual((self.dest/'user').read_text(),'preserved')
+        self.git('branch','change/'+self.slug)
+        refs=self.git('show-ref'); self.start(ok=False)
+        self.assertEqual(self.git('show-ref'),refs)
+        self.assertEqual(self.git('branch','--show-current'),'dev')
 
     def test_S003_T15_e2e(self):
-        self.start(ok=False,fault='path:after-refresh')
-        self.assertTrue(self.dest.exists())
+        self.start(ok=False,fault='dirty:after-refresh')
+        self.assertEqual((self.root/'user-file').read_text(),'protected')
         self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
 
     def test_S003_T16_e2e(self):
@@ -204,7 +219,7 @@ class WorkflowE2E(SystemCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(),self.state()['projection']['sha256'])
         self.assertEqual(value['generation'],self.state()['generation'])
         self.assertNotIn(str(self.base),raw.decode())
-        self.assertEqual(self.git('diff','--cached','--name-only',cwd=self.dest),'')
+        self.assertEqual(self.git('diff','--cached','--name-only',cwd=self.root),'')
 
     def test_S003_T22_e2e(self):
         self.start(); self.projection().unlink()
@@ -221,7 +236,7 @@ class WorkflowE2E(SystemCase):
 
     def test_S003_T24_e2e(self):
         self.start(); self.cli('preflight','--run',self.run_id)
-        file=self.dest/'agent/progress/unrelated.json'; file.write_text('protected')
+        file=self.root/'agent/progress/unrelated.json'; file.write_text('protected')
         self.resume(ok=False); self.assertEqual(file.read_text(),'protected')
 
     def lock(self,filename):
@@ -231,56 +246,53 @@ class WorkflowE2E(SystemCase):
         return handle
 
     def test_S003_T25_e2e(self):
-        self.lock('codex-workflow-locks/'+self.slug+'.lock')
-        self.start(ok=False); self.assertFalse(self.dest.exists())
-        linked=self.base/'linked'
-        self.git('worktree','add','-q','-b','other',str(linked))
-        self.cli('start',self.slug,'--worktree',str(self.dest),'--local',cwd=linked,ok=False)
+        self.lock('codex-workflow-locks/checkout.lock')
+        self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
+        self.assertEqual(self.git('branch','--show-current'),'dev')
 
     def test_S003_T26_e2e(self):
-        handle=self.lock('codex-workflow-locks/'+self.slug+'.lock')
+        handle=self.lock('codex-workflow-locks/checkout.lock')
         handle.write('{"pid":999999,"age":"ancient"}'); handle.flush()
         self.start(ok=False); handle.close()
         self.start(); self.assertEqual(self.state()['phase'],'prepared')
 
     def test_S003_T27_e2e(self):
         self.lock('codex-plan-run.lock')
-        self.lock('codex-workflow-locks/004-other.lock')
         self.start(); self.assertEqual(self.state()['phase'],'prepared')
 
     def test_S003_T28_e2e(self):
         self.start(); before=self.state()
         self.resume(); self.resume()
-        for key in ('run_id','branch','baseline','worktree','intent'):
+        for key in ('run_id','branch','baseline','checkout','intent'):
             self.assertEqual(self.state()[key],before[key])
         self.assertEqual(len(list((self.root/'.git/codex-workflow-runs').glob('*/state.json'))),1)
 
     def test_S003_T29_e2e(self):
         self.start(ok=False,fault='fail:after-intent')
-        self.assertFalse(self.dest.exists()); self.resume()
-        self.assertEqual(self.git('rev-parse','HEAD',cwd=self.dest),self.baseline)
+        self.assertEqual(self.git('branch','--list','change/'+self.slug),''); self.resume()
+        self.assertEqual(self.git('rev-parse','HEAD',cwd=self.root),self.baseline)
 
     def test_S003_T30_e2e(self):
         self.start(ok=False,fault='fail:after-git')
-        self.assertTrue(self.dest.exists()); self.resume()
+        self.assertEqual(self.git('branch','--show-current'),'change/'+self.slug); self.resume()
         self.assertEqual(self.state()['phase'],'prepared')
-        self.assertEqual(len(self.git('worktree','list','--porcelain').split('worktree '))-1,2)
+        self.assertFalse((self.root/'.git/worktrees').exists())
 
     def test_S003_T31_e2e(self):
         self.start()
-        self.git('commit','--allow-empty','-qm','equal-tree source drift',cwd=self.dest)
+        self.git('commit','--allow-empty','-qm','equal-tree source drift',cwd=self.root)
         self.resume(ok=False)
         self.assertEqual(self.state()['baseline'],self.baseline)
 
     def test_S003_T32_e2e(self):
         self.start(remote=True)
-        self.write('target','advanced'); self.commit('advance target'); self.git('push','-q','origin','dev')
+        self.write('target','advanced'); self.commit('advance target'); self.git('push','-q','origin','HEAD:dev')
         self.resume(ok=False); self.assertEqual(self.state()['baseline'],self.baseline)
 
     def test_S003_T33_e2e(self):
-        self.start(); self.git('checkout','-qb','wrong-branch',cwd=self.dest)
+        self.start(); self.git('checkout','-qb','wrong-branch',cwd=self.root)
         self.resume(ok=False)
-        self.assertEqual(self.git('branch','--show-current',cwd=self.dest),'wrong-branch')
+        self.assertEqual(self.git('branch','--show-current',cwd=self.root),'wrong-branch')
 
     def test_S003_T34_e2e(self):
         self.cli('resume','--run','r-'+'a'*32,ok=False)
@@ -290,7 +302,7 @@ class WorkflowE2E(SystemCase):
     def paused(self):
         env={**self.env,'WORKFLOW_E2E_FAULT':'pause:after-intent'}
         process=subprocess.Popen(['perl',str(REPO/'end_to_end/workflow_driver.pl'),'start',self.slug,
-            '--worktree',str(self.dest),'--local'],cwd=self.root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+            '--local'],cwd=self.root,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         self.addCleanup(lambda: process.poll() is None and process.kill())
         deadline=time.monotonic()+20
         while not (self.root/'.git/e2e-ready').exists():
@@ -316,7 +328,7 @@ class WorkflowE2E(SystemCase):
 
     def test_S003_T37_e2e(self):
         directory=self.root/'.git/codex-workflow-runs'; directory.mkdir(); directory.chmod(0o500)
-        try: self.start(ok=False); self.assertFalse(self.dest.exists())
+        try: self.start(ok=False); self.assertEqual(self.git('branch','--list','change/'+self.slug),'')
         finally: directory.chmod(0o700)
 
     def test_S003_T38_e2e(self):
@@ -324,6 +336,12 @@ class WorkflowE2E(SystemCase):
         result=json.loads(self.cli('status','--run',self.run_id).stdout)
         self.assertFalse(result['run_complete'])
         self.assertEqual(before,self.state_file.read_bytes()); self.assertEqual(refs,self.git('show-ref'))
+        self.write('unrelated','protected')
+        result=json.loads(self.cli('status','--run',self.run_id).stdout)
+        self.assertFalse(result['inspection']['checkout_clean'])
+        self.assertTrue(result['inspection']['reconciliation_required'])
+        self.assertEqual(before,self.state_file.read_bytes())
+        self.assertEqual((self.root/'unrelated').read_text(),'protected')
 
     def test_S003_T39_e2e(self):
         self.start(); self.resume(); self.cli('preflight','--run',self.run_id)

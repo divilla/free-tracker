@@ -4,6 +4,7 @@
 
 - Follow the architecture specified in [agent/ARCHITECTURE.md](agent/ARCHITECTURE.md).
 - Product requirements are defined in [agent/PRD.md](agent/PRD.md); implementation changes live in `agent/changes/<slug>.md`, where `<slug>` includes its number, starting with `agent/changes/001-build-scaffold.md`.
+- Factory execution uses the existing checkout only. Do not create additional linked checkouts or introduce destination/ownership management for them; create or resume the change branch in place and preserve unrelated user files.
 
 ## Change-authoring baseline policy
 

@@ -45,7 +45,7 @@ for my $case (grep { $_->[0] !~ /\Acommit-/ } workflow_cases()) {
             is(git($f, 'show-ref'), $before, "$label: preserves local refs");
             is(git($f->{remote}, 'show-ref'), $remote_before, "$label: preserves remote refs");
             is(git($f, 'status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none'),
-                $status_before, "$label: preserves worktree and index");
+                $status_before, "$label: preserves checkout and index");
             ok(!-e "$f->{bin}/remote-calls", "$label: no remote Git commands");
             ok(!-e "$f->{bin}/auth-calls", "$label: fails before authentication");
             ok(!-e "$f->{bin}/codex-called", "$label: does not start Codex");
@@ -64,7 +64,7 @@ for my $script ('commit-user.pl', 'commit-agent.pl') {
     is($status, 0, "$script accepts uncommitted work when authenticated") or diag $error;
     is(git($f, 'show', 'HEAD:content'), 'additional unstaged work', "$script commits the current tracked content");
     is(git($f, 'show', 'HEAD:new-file'), 'untracked work', "$script includes new files");
-    is(git($f, 'status', '--porcelain'), '', "$script leaves a clean worktree");
+    is(git($f, 'status', '--porcelain'), '', "$script leaves a clean checkout");
     is(head($f, 'change/123-auth'), git($f, 'rev-parse', 'HEAD'), "$script publishes the commit");
 }
 

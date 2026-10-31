@@ -25,8 +25,8 @@ sub git_value {
 sub slug_ok { defined $_[0] && $_[0] =~ /\A[0-9][0-9][0-9]+-[a-z0-9-_]+\z/ }
 
 sub evidence_root {
-    my $common = abs_path(git_value(qw(rev-parse --git-common-dir)));
-    defined $common or die "cannot resolve common Git directory\n";
+    my $common = abs_path(git_value(qw(rev-parse --absolute-git-dir)));
+    defined $common or die "cannot resolve Git directory\n";
     return File::Spec->catdir($common, 'mch-workflow-evidence');
 }
 

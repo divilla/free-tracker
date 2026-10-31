@@ -182,8 +182,8 @@ sub promotion_tests {
     git($f, 'push', '-q', 'origin', $source);
     write_file("$f->{repo}/dirty", 'untracked');
     ($status, $out, $error) = run_script($f, $script);
-    is($status, 1, 'dirty worktree blocks mutation');
-    like($error, qr/error: Uncommitted work detected\./, 'dirty worktree explained');
+    is($status, 1, 'dirty checkout blocks mutation');
+    like($error, qr/error: Uncommitted work detected\./, 'dirty checkout explained');
     is(head($f, $destination), $f->{initial}, 'dirty failure leaves destination unchanged');
     unlink "$f->{repo}/dirty" or die $!;
     reject_push($f);

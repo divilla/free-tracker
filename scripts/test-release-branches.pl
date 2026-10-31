@@ -69,7 +69,7 @@ for my $checkout ('stage', 'dev') {
     my ($status, $out, $error) = initialize($f);
     is($status, 0, "initialization succeeds while on local-only $checkout") or diag $error;
     is(git($f, 'branch', '--show-current'), $checkout, "$checkout remains checked out");
-    is(git($f, 'status', '--porcelain'), '', "$checkout index and worktree match its initialized tip");
+    is(git($f, 'status', '--porcelain'), '', "$checkout index and checkout match its initialized tip");
     is(git($f, 'rev-parse', "backup/$checkout-before-init-$old_tip"), $old_tip,
         "$checkout unpublished work remains accessible in backup");
     for my $branch ('stage', 'dev') {
@@ -105,7 +105,7 @@ for my $checkout ('work/in-progress', 'master', 'detached', 'missing-master') {
     is(git($f, 'branch', '--show-current'), $original_branch, "$checkout: original checkout is restored");
     is(git($f, 'rev-parse', 'HEAD'), $checkout eq 'master' ? $latest : $original,
         "$checkout: only master checkout advances during initialization");
-    is(git($f, 'status', '--porcelain'), '', "$checkout: worktree remains clean");
+    is(git($f, 'status', '--porcelain'), '', "$checkout: checkout remains clean");
 }
 
 for my $failure ('diverged', 'unpublished') {

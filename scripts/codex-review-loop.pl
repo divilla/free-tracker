@@ -407,9 +407,9 @@ sub main {
 	defined $change or fail('current branch must match ^change/([0-9][0-9][0-9]+-[a-z0-9-_]+)$');
 	-f $change && -r $change or fail("change file not found or unreadable: $change");
 
-	my ($worktree_changes, $status) = capture_command(0, 'git', 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none');
+	my ($checkout_changes, $status) = capture_command(0, 'git', 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none');
 	$status == 0 or exit $status;
-	if ($worktree_changes ne '') {
+	if ($checkout_changes ne '') {
 		print STDERR "error: Uncommitted work detected. Commit or stash your changes, then retry.\n";
 		exit 1;
 	}
@@ -452,7 +452,7 @@ sub main {
 		save_receipt($slug, { %$evidence, outcome => $outcome, exit_code => $status,
 			response => -f $findings_file ? read_file($findings_file) : '' });
 		exit $status if $status != 0;
-		$unchanged or fail('review changed the source, branch or worktree; evidence is invalid');
+		$unchanged or fail('review changed the source, branch or checkout; evidence is invalid');
 		-f $findings_file or fail('review did not write findings.md');
 
 		print_file_block($findings_file);

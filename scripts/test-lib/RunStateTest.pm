@@ -37,7 +37,6 @@ sub run_fixture {
     write_file("$f->{repo}/.gitignore", "*.private\n");
     $f->{baseline} = commit_all($f);
     git($f, 'branch', '-f', 'dev'); git($f, 'push', '-q', 'origin', 'dev');
-    $f->{dest} = dirname($f->{repo}) . '/prepared tree';
     $f->{common} = abs_path("$f->{repo}/.git");
     return $f;
 }
@@ -60,7 +59,7 @@ sub invoke {
 sub start_run {
     my ($f, $mode, $hook, @extra) = @_;
     @extra = ('--local') unless @extra;
-    my @r = invoke($f, $mode, $hook, 'start', $f->{slug}, '--worktree', $f->{dest}, @extra);
+    my @r = invoke($f, $mode, $hook, 'start', $f->{slug}, @extra);
     if ($r[1] =~ /"run_id"/) { my $v = eval { decode_json($r[1]) }; $f->{id} = $v->{run_id} if $v; }
     if (!$f->{id}) {
         my @paths = bsd_glob "$f->{common}/codex-workflow-runs/*/state.json";
@@ -114,7 +113,7 @@ sub active_child_case {
 #!/usr/bin/env perl
 use strict;
 use warnings;
-if ($ENV{S003_BARRIER} && join(' ', @ARGV) =~ /worktree add/) {
+if ($ENV{S003_BARRIER} && join(' ', @ARGV) =~ /checkout --no-overwrite-ignore -b/) {
     open my $ready, '>', "$ENV{S003_BARRIER}/ready" or die $!;
     print {$ready} "ready\n";
     close $ready;
@@ -133,7 +132,7 @@ WRAPPER
         $ENV{S003_BARRIER} = $f->{bin}; $ENV{S003_REAL_GIT} = $realgit;
         open STDOUT, '>', "$f->{bin}/cli.out" or die $!;
         open STDERR, '>', "$f->{bin}/cli.err" or die $!;
-        exec $^X, "$f->{repo}/scripts/workflow-run.pl", 'start', $f->{slug}, '--worktree', $f->{dest}, '--local' or POSIX::_exit(99);
+        exec $^X, "$f->{repo}/scripts/workflow-run.pl", 'start', $f->{slug}, '--local' or POSIX::_exit(99);
     }
     # FIFO handshake proves the Git child is actively owned, not a timed guess.
     local $SIG{ALRM} = sub { kill 'KILL', $pid; die "active-child barrier timeout\n"; };
@@ -147,11 +146,11 @@ WRAPPER
         open my $g, '>', $go or die $!; print {$g} "continue\n"; close $g;
         # Blocking lock is an event barrier: wait until supervisor AND worker
         # have exited, even though neither is this process's direct child.
-        open my $lock, '<', "$f->{common}/codex-workflow-locks/$f->{slug}.lock" or die $!;
+        open my $lock, '<', "$f->{common}/codex-workflow-locks/checkout.lock" or die $!;
         flock($lock, LOCK_EX) or die $!; close $lock;
     } else {
         is($status >> 8, $signal eq 'INT' ? 130 : 143, 'signal stops active process group and waits');
-        ok(!-e $f->{dest}, 'blocked Git child did not later create worktree');
+        is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'blocked Git child did not later switch branch');
     }
     alarm 0;
     my @paths = bsd_glob "$f->{common}/codex-workflow-runs/*/state.json";
@@ -177,9 +176,9 @@ sub cases {
     subtest "$mode :: S003_T02_invalid_identity" => sub {
         my $f = run_fixture();
         for my $bad ('3-short', '../003-escape', '003-UPPER', 'change/003-name', '') {
-            my ($rc) = invoke($f, $mode, undef, 'start', $bad, '--worktree', $f->{dest}, '--local'); ok($rc, "invalid slug $bad");
+            my ($rc) = invoke($f, $mode, undef, 'start', $bad, '--local'); ok($rc, "invalid slug $bad");
         }
-        git($f, 'checkout', '--detach', '-q'); my ($rc) = start_run($f, $mode); ok($rc, 'detached context rejected'); ok(!-e $f->{dest}, 'no setup');
+        git($f, 'checkout', '--detach', '-q'); my ($rc) = start_run($f, $mode); ok($rc, 'detached context rejected'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no setup');
         my $s = mch::WorkflowRun->new(root => dirname($f->{repo})); rejects(sub { $s->repository }, qr/Git operation failed/, 'nonrepository');
     };
     subtest "$mode :: S003_T03_inventory_fail_closed" => sub {
@@ -190,7 +189,7 @@ sub cases {
             else { edit($f, 'agent/PLAN.md', sub { my $v = shift; return '' if $variant eq 'empty'; $v =~ s/003-workflow-run-state/004-other/g if $variant eq 'zero'; $v .= $v if $variant eq 'duplicate'; $v =~ s/S003/S004/g if $variant eq 'id'; $v =~ s{changes/003-workflow-run-state.md}{changes/003-other.md} if $variant eq 'path'; $v }); }
             rejects(sub { runner($f)->inventory($f->{slug}) }, qr/(?:PLAN|cannot read)/, $variant);
             chmod 0600, "$f->{repo}/agent/PLAN.md" if $variant eq 'unreadable';
-            ok(!-e $f->{dest}, 'no Git mutation');
+            is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no Git mutation');
         }
     };
     subtest "$mode :: S003_T04_readiness_inputs" => sub {
@@ -207,13 +206,11 @@ sub cases {
     };
     subtest "$mode :: S003_T05_configuration_validation" => sub {
         my $f = run_fixture();
-        for my $args ([], ['wat'], ['status', '--run', '../../x'], ['start', $f->{slug}], ['start', $f->{slug}, '--worktree', $f->{dest}], ['start', $f->{slug}, '--worktree', $f->{dest}, '--local', '--remote', 'origin'], ['start', $f->{slug}, '--wat']) {
+        for my $args ([], ['wat'], ['status', '--run', '../../x'], ['start', $f->{slug}], ['start', $f->{slug}, '--worktree', $f->{repo}], ['start', $f->{slug}, '--local', '--remote', 'origin'], ['start', $f->{slug}, '--wat']) {
             my ($rc) = invoke($f, $mode, undef, @$args); is($rc, 2, 'usage error is 2');
         }
         my ($rc) = start_run($f, $mode, undef, '--remote', 'unknown'); ok($rc, 'unknown remote');
-        my $link = dirname($f->{repo}) . '/link'; symlink dirname($f->{repo}), $link or die $!;
-        $f->{dest} = "$link/escape"; ($rc) = start_run($f, $mode); ok($rc, 'symlink destination');
-        $f->{dest} = "$f->{repo}/../escape"; ($rc) = start_run($f, $mode); ok($rc, 'traversal destination');
+
     };
     subtest "$mode :: S003_T06_missing_prerequisites" => sub {
         for my $variant (qw(manifest dependency scope revision result transitive source artifact)) {
@@ -253,7 +250,7 @@ sub cases {
             my ($rc, $out, $err) = start_run($f, $mode); is($rc, 0, "from $cwd") or diag $err;
             my $v = state($f); is($v->{baseline}, $f->{baseline}, 'full local SHA');
             is($v->{repository}{common}, $f->{common}, 'same canonical identity');
-            like(slurp("$f->{dest}/$v->{projection}{path}"), qr/not checked/, 'remote freshness explicitly unchecked');
+            like(slurp("$f->{repo}/$v->{projection}{path}"), qr/not checked/, 'remote freshness explicitly unchecked');
         }
     };
     subtest "$mode :: S003_T09_remote_baseline" => sub {
@@ -262,11 +259,11 @@ sub cases {
         git($f, 'config', '--unset-all', 'remote.origin.fetch'); git($f, 'config', 'remote.origin.fetch', '+refs/heads/master:refs/remotes/origin/master');
         my $caller = git($f, 'rev-parse', 'HEAD'); my ($rc, $out, $err) = start_run($f, $mode, undef, '--remote', 'origin');
         is($rc, 0, 'explicit restricted-fetch refresh') or diag $err;
-        is(state($f)->{baseline}, $new, 'select exact refreshed remote'); is(git($f, 'rev-parse', 'dev'), $f->{baseline}, 'local dev untouched'); is(git($f, 'rev-parse', 'HEAD'), $caller, 'caller unchanged');
+        is(state($f)->{baseline}, $new, 'select exact refreshed remote'); is(git($f, 'rev-parse', 'dev'), $f->{baseline}, 'local dev untouched'); is(git($f, 'rev-parse', 'HEAD'), $caller, 'selected branch at refreshed baseline');
     };
     subtest "$mode :: S003_T10_failed_refresh" => sub {
         my $f = run_fixture(); git($f, 'remote', 'set-url', 'origin', dirname($f->{repo}) . '/missing.git');
-        my ($rc, $out, $err) = start_run($f, $mode, undef, '--remote', 'origin'); ok($rc, 'failed refresh nonzero'); like($err, qr/refresh failed/, 'no stale fallback'); ok(!-e $f->{dest}, 'no setup');
+        my ($rc, $out, $err) = start_run($f, $mode, undef, '--remote', 'origin'); ok($rc, 'failed refresh nonzero'); like($err, qr/refresh failed/, 'no stale fallback'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no setup');
         my $s = runner($f); my $real = $s->can('command');
         $s->{command} = sub { return (0, 'not-a-commit') if $_[3] && $_[3] eq 'rev-parse'; return $real->($s, @_); };
         rejects(sub { $s->commit('dev') }, qr/commit/, 'invalid observation');
@@ -279,22 +276,33 @@ sub cases {
                 local $r->{command}; return $actual->($r, @a);
             };
             rejects(sub { $r->target({mode => 'remote', remote => 'origin'}) }, qr/(?:refresh failed|Git operation failed)/, "$failure failure independently blocks");
-            unlike($@, qr/SECRET/, 'raw child diagnostics not exposed'); ok(!-e $fixture->{dest}, 'no setup');
+            unlike($@, qr/SECRET/, 'raw child diagnostics not exposed'); is(git($fixture, 'branch', '--list', "change/$fixture->{slug}"), '', 'no setup');
         }
     };
     subtest "$mode :: S003_T11_missing_baseline" => sub {
         for my $ref ('missing', 'HEAD:content', '0' x 40) {
             my $f = run_fixture(); rejects(sub { runner($f)->commit($ref) }, qr/(?:Git operation failed|commit)/, 'noncommit/missing ref');
         }
-        my $f = run_fixture(); git($f, 'branch', '-D', 'dev'); my ($rc) = start_run($f, $mode); ok($rc, 'missing dev fails'); ok(!-e $f->{dest}, 'no initialization');
+        my $f = run_fixture(); git($f, 'branch', '-D', 'dev'); my ($rc) = start_run($f, $mode); ok($rc, 'missing dev fails'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no initialization');
         $f = run_fixture(); git($f->{remote}, 'update-ref', '-d', 'refs/heads/dev'); ($rc) = start_run($f, $mode, undef, '--remote', 'origin'); ok($rc, 'remote dev missing fails despite cached ref');
     };
-    subtest "$mode :: S003_T12_isolated_setup" => sub {
+    subtest "$mode :: S003_T12_current_checkout_setup" => sub {
         my $f = run_fixture(); write_file("$f->{repo}/secret.private", 'SECRET sentinel'); my $before = snapshot($f); my $remote = git($f->{remote}, 'show-ref');
         my ($rc, $out, $err) = start_run($f, $mode); is($rc, 0, 'fresh setup') or diag $err;
-        is(git($f, 'branch', '--show-current'), 'master', 'caller checkout stays'); is(git($f, 'status', '--porcelain=v1'), '', 'caller index/files clean');
-        is(git($f->{dest}, 'rev-parse', 'HEAD'), $f->{baseline}, 'worktree exact SHA'); is(git($f->{remote}, 'show-ref'), $remote, 'remote refs untouched');
+        is(git($f, 'branch', '--show-current'), "change/$f->{slug}", 'existing checkout selects change branch'); is(git($f, 'diff', '--cached', '--name-only'), '', 'index remains unstaged');
+        ok(!-d "$f->{common}/worktrees", 'no additional checkout metadata');
+        is(git($f->{repo}, 'rev-parse', 'HEAD'), $f->{baseline}, 'checkout exact SHA'); is(git($f->{remote}, 'show-ref'), $remote, 'remote refs untouched');
         is(slurp("$f->{repo}/secret.private"), 'SECRET sentinel', 'ignored user file untouched'); unlike($out, qr/SECRET sentinel/, 'not echoed');
+        my $conflict = run_fixture();
+        write_file("$conflict->{repo}/asset.private", 'baseline asset');
+        git($conflict, 'add', '-f', 'asset.private'); git($conflict, 'commit', '-qm', 'baseline asset');
+        git($conflict, 'branch', '-f', 'dev');
+        git($conflict, 'rm', '-q', 'asset.private'); git($conflict, 'commit', '-qm', 'caller without asset');
+        write_file("$conflict->{repo}/asset.private", 'user ignored asset');
+        my $before_conflict = snapshot($conflict);
+        ($rc) = start_run($conflict, $mode); ok($rc, 'ignored collision blocks branch selection');
+        is(snapshot($conflict), $before_conflict, 'conflict preserves caller branch, refs and index');
+        is(slurp("$conflict->{repo}/asset.private"), 'user ignored asset', 'ignored collision never overwritten');
     };
     subtest "$mode :: S003_T13_dirty_input_preserved" => sub {
         for my $kind (qw(staged unstaged deleted hidden submodule)) {
@@ -306,24 +314,22 @@ sub cases {
                 write_file("$f->{repo}/nested/content", 'dirty nested'); git($f, 'config', 'submodule.nested.ignore', 'all');
             } else { write_file("$f->{repo}/content", 'protected'); git($f, 'add', 'content') if $kind eq 'staged'; }
             git($f, 'config', 'status.showUntrackedFiles', 'no'); my $before = snapshot($f);
-            my ($rc) = start_run($f, $mode, undef, '--remote', 'origin'); ok($rc, "$kind rejected"); is(snapshot($f), $before, 'refs/index/status untouched'); ok(!-e $f->{dest}, 'no setup');
+            my ($rc) = start_run($f, $mode, undef, '--remote', 'origin'); ok($rc, "$kind rejected"); is(snapshot($f), $before, 'refs/index/status untouched'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no setup');
         }
     };
     subtest "$mode :: S003_T14_existing_setup_rejected" => sub {
-        for my $kind (qw(local remote empty occupied run)) {
+        for my $kind (qw(local remote run)) {
             my $f = run_fixture();
             git($f, 'branch', "change/$f->{slug}") if $kind eq 'local';
             git($f, 'update-ref', "refs/remotes/origin/change/$f->{slug}", $f->{baseline}) if $kind eq 'remote';
-            if ($kind eq 'empty' || $kind eq 'occupied') { mkdir $f->{dest}; write_file("$f->{dest}/keep", 'keep') if $kind eq 'occupied'; }
             if ($kind eq 'run') { start_run($f, $mode); }
             my $before = snapshot($f); my ($rc) = start_run($f, $mode); ok($rc, "$kind existing rejects"); is(snapshot($f), $before, 'existing state preserved');
         }
     };
     subtest "$mode :: S003_T15_setup_races" => sub {
-        for my $kind (qw(path branch dirty)) {
-            my $f = run_fixture(); my $hook = sub { return unless $_[0] eq 'after-refresh'; if ($kind eq 'path') { mkdir $f->{dest}; write_file("$f->{dest}/keep", 'race'); } elsif ($kind eq 'branch') { git($f, 'branch', "change/$f->{slug}"); } else { write_file("$f->{repo}/.race", 'race'); } };
+        for my $kind (qw(branch dirty)) {
+            my $f = run_fixture(); my $hook = sub { return unless $_[0] eq 'after-refresh'; if ($kind eq 'branch') { git($f, 'branch', "change/$f->{slug}"); } else { write_file("$f->{repo}/.race", 'race'); } };
             my ($rc) = start_run($f, $mode, $hook); ok($rc, "$kind race rejects nonforcing");
-            is(slurp("$f->{dest}/keep"), 'race', 'concurrent user file retained') if $kind eq 'path';
             is(git($f, 'rev-parse', "change/$f->{slug}"), $f->{baseline}, 'concurrent branch retained') if $kind eq 'branch';
             is(slurp("$f->{repo}/.race"), 'race', 'dirty race retained') if $kind eq 'dirty';
         }
@@ -373,12 +379,12 @@ sub cases {
         $s->save_state($new, $old->{generation}); rejects(sub { $s->save_state($old, $old->{generation}) }, qr/stale generation/, 'obsolete writer'); is_deeply(state($f)->{extra_extension}, {keep => 1}, 'newer extension retained');
     };
     subtest "$mode :: S003_T21_portable_projection" => sub {
-        my $f = run_fixture(); start_run($f, $mode); my $v = state($f); my $bytes = slurp("$f->{dest}/$v->{projection}{path}"); my $p = decode_json($bytes);
-        is($p->{generation}, $v->{generation}, 'matching generations'); is(sha256_hex($bytes), $v->{projection}{sha256}, 'runtime hashes exact projection'); unlike($bytes, qr{(?:/tmp/|://|SECRET|raw.output)}, 'sanitized'); is(git($f->{dest}, 'diff', '--cached', '--name-only'), '', 'nothing staged');
+        my $f = run_fixture(); start_run($f, $mode); my $v = state($f); my $bytes = slurp("$f->{repo}/$v->{projection}{path}"); my $p = decode_json($bytes);
+        is($p->{generation}, $v->{generation}, 'matching generations'); is(sha256_hex($bytes), $v->{projection}{sha256}, 'runtime hashes exact projection'); unlike($bytes, qr{(?:/tmp/|://|SECRET|raw.output)}, 'sanitized'); is(git($f->{repo}, 'diff', '--cached', '--name-only'), '', 'nothing staged');
     };
     subtest "$mode :: S003_T22_projection_reconciliation" => sub {
         for my $kind (qw(absent stale tampered failure)) {
-            my $f = run_fixture(); my ($rc) = start_run($f, $mode, $kind eq 'failure' ? failure_at('before-projection') : undef); my $v = state($f); my $path = "$f->{dest}/$v->{projection}{path}";
+            my $f = run_fixture(); my ($rc) = start_run($f, $mode, $kind eq 'failure' ? failure_at('before-projection') : undef); my $v = state($f); my $path = "$f->{repo}/$v->{projection}{path}";
             if ($kind eq 'absent') { unlink $path; }
             elsif ($kind eq 'tampered') { write_file($path, 'user tampered'); }
             elsif ($kind eq 'stale') { my $s = runner($f); $s->lock($f->{slug}); push @{$v->{observations}}, {projection_sha256 => $v->{projection}{sha256}}; $s->save_state($v, $v->{generation}); }
@@ -394,48 +400,48 @@ sub cases {
         my ($rc, $out) = start_run($f, $mode); is($rc, 0, 'legacy artifacts do not set gates'); unlike($out, qr/SECRET/, 'no secret output'); is(slurp("$f->{common}/codex-plan-runs/old.tsv"), 'success SECRET', 'preserved TSV');
         is_deeply(state($f)->{reviews}, [], 'legacy success not imported');
         is(scalar @{state($f)->{artifacts}}, 1, 'immutable diagnostic retained by digest reference');
-        my $v = state($f); unlike(slurp("$f->{dest}/$v->{projection}{path}"), qr/SECRET/, 'diagnostic raw content not projected');
+        my $v = state($f); unlike(slurp("$f->{repo}/$v->{projection}{path}"), qr/SECRET/, 'diagnostic raw content not projected');
     };
     subtest "$mode :: S003_T24_precise_bookkeeping_dirt" => sub {
         my $f = run_fixture(); start_run($f, $mode); my ($rc) = invoke($f, $mode, undef, 'preflight', '--run', $f->{id}); is($rc, 0, 'exact projection accepted');
-        write_file("$f->{dest}/agent/progress/unrelated.json", 'user data');
-        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'unrelated progress file blocks'); is(slurp("$f->{dest}/agent/progress/unrelated.json"), 'user data', 'preserved');
+        write_file("$f->{repo}/agent/progress/unrelated.json", 'user data');
+        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'unrelated progress file blocks'); is(slurp("$f->{repo}/agent/progress/unrelated.json"), 'user data', 'preserved');
     };
     subtest "$mode :: S003_T25_single_owner" => sub {
-        my $f = run_fixture(); my $s = runner($f); $s->lock($f->{slug}); $s->diagnostic('r-' . 'a' x 32); my $bytes = slurp("$f->{common}/codex-workflow-locks/$f->{slug}.lock");
+        my $f = run_fixture(); my $s = runner($f); $s->lock($f->{slug}); $s->diagnostic('r-' . 'a' x 32); my $bytes = slurp("$f->{common}/codex-workflow-locks/checkout.lock");
         my ($rc) = start_run($f, $mode); ok($rc, 'same repository contender excluded');
-        my $linked = dirname($f->{repo}) . '/linked'; git($f, 'worktree', 'add', '-qb', 'other', $linked);
-        my $other = mch::WorkflowRun->new(root => $linked); $other->repository; rejects(sub { $other->lock($f->{slug}) }, qr/active owner/, 'linked contender excluded'); is(slurp("$f->{common}/codex-workflow-locks/$f->{slug}.lock"), $bytes, 'diagnostics unchanged');
+        my $other = runner($f); rejects(sub { $other->lock('004-other') }, qr/active owner/, 'different change cannot take over the same checkout');
+        is(slurp("$f->{common}/codex-workflow-locks/checkout.lock"), $bytes, 'diagnostics unchanged');
     };
     subtest "$mode :: S003_T26_lock_lifetime" => sub {
         my $f = run_fixture(); my $s = runner($f); $s->lock($f->{slug}); $s->diagnostic('r-' . 'b' x 32);
-        write_file("$f->{common}/codex-workflow-locks/$f->{slug}.lock", '{"pid":999999,"age":"ancient"}');
+        write_file("$f->{common}/codex-workflow-locks/checkout.lock", '{"pid":999999,"age":"ancient"}');
         rejects(sub { runner($f)->lock($f->{slug}) }, qr/active owner/, 'misleading metadata cannot steal'); delete $s->{lock}; my $next = runner($f); $next->lock($f->{slug}); pass('kernel unlock, not PID/age, enables reconciliation');
         active_child_case('KILL') if $mode eq 'G';
     };
     subtest "$mode :: S003_T27_lock_domains" => sub {
         my $f = run_fixture(); open my $outer, '>', "$f->{common}/codex-plan-run.lock" or die $!; flock($outer, 2) or die $!;
-        my $a = runner($f); $a->lock($f->{slug}); my $b = runner($f); $b->lock('004-other'); pass('outer plan and different slug locks independent'); rejects(sub { runner($f)->lock($f->{slug}) }, qr/active owner/, 'same slug excluded');
+        my $a = runner($f); $a->lock($f->{slug}); pass('outer plan lock is independent'); rejects(sub { runner($f)->lock('004-other') }, qr/active owner/, 'all changes serialize this checkout'); rejects(sub { runner($f)->lock($f->{slug}) }, qr/active owner/, 'same slug excluded');
     };
     subtest "$mode :: S003_T28_idempotent_resume" => sub {
         my $f = run_fixture(); start_run($f, $mode); my $v = state($f);
         for (1..2) { my ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'explicit repeat resume') or diag $err; }
-        my $last = state($f); for (qw(run_id branch worktree baseline source intent)) { is($last->{$_}, $v->{$_}, "immutable $_"); }
-        is(scalar(runner($f)->worktrees), 2, 'no duplicate worktree');
+        my $last = state($f); for (qw(run_id branch checkout baseline source intent)) { is($last->{$_}, $v->{$_}, "immutable $_"); }
+        is(git($f, 'branch', '--list', "change/$f->{slug}"), "* change/$f->{slug}", 'same single branch');
     };
     subtest "$mode :: S003_T29_resume_before_creation" => sub {
-        my $f = run_fixture(); my ($rc) = start_run($f, $mode, failure_at('after-intent')); ok($rc, 'intent interrupted'); ok(!-e $f->{dest}, 'no Git creation');
-        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'intent resumed'); is(git($f->{dest}, 'rev-parse', 'HEAD'), $f->{baseline}, 'original baseline');
+        my $f = run_fixture(); my ($rc) = start_run($f, $mode, failure_at('after-intent')); ok($rc, 'intent interrupted'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no Git creation');
+        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'intent resumed'); is(git($f->{repo}, 'rev-parse', 'HEAD'), $f->{baseline}, 'original baseline');
     };
     subtest "$mode :: S003_T30_resume_after_creation" => sub {
-        my $f = run_fixture(); my ($rc) = start_run($f, $mode, failure_at('after-git')); ok($rc, 'post-Git interruption'); ok(-d $f->{dest}, 'created worktree retained'); my $head = git($f->{dest}, 'rev-parse', 'HEAD');
-        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'owned Git outcome reconciled'); is(git($f->{dest}, 'rev-parse', 'HEAD'), $head, 'no reset');
+        my $f = run_fixture(); my ($rc) = start_run($f, $mode, failure_at('after-git')); ok($rc, 'post-Git interruption'); is(git($f, 'branch', '--show-current'), "change/$f->{slug}", 'created branch retained'); my $head = git($f->{repo}, 'rev-parse', 'HEAD');
+        ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'owned Git outcome reconciled'); is(git($f->{repo}, 'rev-parse', 'HEAD'), $head, 'no reset');
     };
     subtest "$mode :: S003_T31_source_drift" => sub {
         for my $equal (0, 1) {
-            my $f = run_fixture(); start_run($f, $mode); git($f->{dest}, 'config', 'user.name', 'Test'); git($f->{dest}, 'config', 'user.email', 'test@example.invalid');
-            write_file("$f->{dest}/content", 'changed') unless $equal; git($f->{dest}, 'add', 'content') unless $equal; git($f->{dest}, 'commit', '--allow-empty', '-qm', 'changed source');
-            my $head = git($f->{dest}, 'rev-parse', 'HEAD'); my ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'changed commit blocked including equal tree'); like($err, qr/source drift/, 'drift diagnosis'); is(state($f)->{baseline}, $f->{baseline}, 'baseline preserved'); is(git($f->{dest}, 'rev-parse', 'HEAD'), $head, 'no reset');
+            my $f = run_fixture(); start_run($f, $mode); git($f->{repo}, 'config', 'user.name', 'Test'); git($f->{repo}, 'config', 'user.email', 'test@example.invalid');
+            write_file("$f->{repo}/content", 'changed') unless $equal; git($f->{repo}, 'add', 'content') unless $equal; git($f->{repo}, 'commit', '--allow-empty', '-qm', 'changed source');
+            my $head = git($f->{repo}, 'rev-parse', 'HEAD'); my ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'changed commit blocked including equal tree'); like($err, qr/source drift/, 'drift diagnosis'); is(state($f)->{baseline}, $f->{baseline}, 'baseline preserved'); is(git($f->{repo}, 'rev-parse', 'HEAD'), $head, 'no reset');
             ok(grep({ ($_->{source_new} // '') eq $head && !$_->{evidence_usable} } @{state($f)->{observations}}), 'old/new source observation retained');
         }
     };
@@ -448,18 +454,13 @@ sub cases {
         }
     };
     subtest "$mode :: S003_T33_resume_identity_conflicts" => sub {
-        for my $kind (qw(branch missing path repository config partial owner owner-missing)) {
+        for my $kind (qw(branch path repository config source)) {
             my $f = run_fixture(); start_run($f, $mode); my $v = state($f);
-            if ($kind eq 'branch') { git($f->{dest}, 'checkout', '-qb', 'wrong'); }
-            elsif ($kind eq 'missing') { rename $f->{dest}, "$f->{dest}-moved" or die $!; }
-            elsif ($kind eq 'path') { $v->{worktree} .= '-wrong'; }
+            if ($kind eq 'branch') { git($f->{repo}, 'checkout', '-qb', 'wrong'); }
+            elsif ($kind eq 'path') { $v->{checkout} .= '-wrong'; }
             elsif ($kind eq 'repository') { $v->{repository}{id} = 'wrong'; }
             elsif ($kind eq 'config') { $v->{config}{target} = 'master'; }
-            elsif ($kind eq 'owner' || $kind eq 'owner-missing') {
-                my $path = runner($f)->owner_path($v);
-                if ($kind eq 'owner') { write_file($path, 'different run owner'); } else { unlink $path or die $!; }
-            }
-            else { git($f, 'worktree', 'remove', '--force', $f->{dest}); }
+            else { git($f, 'commit', '--allow-empty', '-qm', 'changed source'); }
             write_file("$f->{common}/codex-workflow-runs/$f->{id}/state.json", encode_json($v)) if $kind =~ /^(path|repository|config)$/;
             my ($rc) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, "$kind not adopted");
         }
@@ -467,7 +468,7 @@ sub cases {
         git($f, 'remote', 'set-url', 'origin', dirname($f->{repo}) . '/changed.git');
         my ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'remote URL configuration cannot silently change'); like($err, qr/remote identity changed/, 'reject before fetch');
         $f = run_fixture(); prerequisite_fixture($f); start_run($f, $mode);
-        edit($f, "agent/progress/prerequisites/$f->{slug}.json", sub { my $v = decode_json(shift); $v->{dependencies}{'002-dependency'}{checks}[0]{scope} .= ' changed'; encode_json($v) }); commit_all($f, 'changed effective evidence');
+        edit($f, "agent/progress/prerequisites/$f->{slug}.json", sub { my $v = decode_json(shift); $v->{dependencies}{'002-dependency'}{checks}[0]{scope} .= ' changed'; encode_json($v) }); git($f, 'add', "agent/progress/prerequisites/$f->{slug}.json"); git($f, 'commit', '-qm', 'changed effective evidence');
         ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($rc, 'effective evidence snapshot cannot silently change'); like($err, qr/prerequisite configuration changed/, 'requires explicit reconciliation');
     };
     subtest "$mode :: S003_T34_no_inferred_resume" => sub {
@@ -492,28 +493,37 @@ sub cases {
             if (!$pid) { open STDOUT, '>', '/dev/null'; open STDERR, '>', '/dev/null'; start_run($f, $mode, sub { kill 'KILL', $$ if $_[0] eq $boundary; }); POSIX::_exit(99); }
             waitpid($pid, 0); is($? & 127, 9, "actual SIGKILL $boundary");
             my @states = bsd_glob "$f->{common}/codex-workflow-runs/*/state.json";
-            if ($boundary eq 'before-intent') { is(scalar @states, 0, 'no partial intent accepted'); ok(!-e $f->{dest}, 'no Git effect'); next; }
+            if ($boundary eq 'before-intent') { is(scalar @states, 0, 'no partial intent accepted'); is(git($f, 'branch', '--list', "change/$f->{slug}"), '', 'no Git effect'); next; }
             is(scalar @states, 1, 'one durable run'); $f->{id} = decode_json(slurp($states[0]))->{run_id};
             my ($rc, $out, $err) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); is($rc, 0, 'resume reconciles real killed owner') or diag $err;
-            is(scalar(runner($f)->worktrees), 2, 'never duplicates Git setup');
+            is(git($f, 'branch', '--show-current'), "change/$f->{slug}", 'never duplicates Git setup');
         }
     };
     subtest "$mode :: S003_T37_git_and_storage_failure" => sub {
-        my $f = run_fixture(); my ($rc) = start_run($f, $mode, sub { if ($_[0] eq 'before-git') { mkdir $f->{dest}; write_file("$f->{dest}/user", 'protected'); } }); ok($rc, 'real worktree-add failure nonzero'); is(slurp("$f->{dest}/user"), 'protected', 'partial user data preserved'); is(state($f)->{phase}, 'blocked', 'intent retained');
+        my $f = run_fixture(); my ($rc) = start_run($f, $mode, sub { if ($_[0] eq 'before-git') { git($f, 'branch', "change/$f->{slug}"); write_file("$f->{repo}/user.private", 'protected'); } });
+        ok($rc, 'real branch-creation failure nonzero'); is(slurp("$f->{repo}/user.private"), 'protected', 'user data preserved'); is(state($f)->{phase}, 'blocked', 'intent retained');
+        my ($retry) = invoke($f, $mode, undef, 'resume', '--run', $f->{id}); ok($retry, 'unselected conflicting branch is not adopted');
         my $s = runner($f); rejects(sub { $s->atomic('/proc/self/workflow-no-write.json', 'bytes') }, qr/(?:create|replace|read|owned)/, 'real unwritable filesystem');
         for my $kind ('runtime', 'projection') {
-            my $fixture = run_fixture(); my $directory = $kind eq 'runtime' ? "$fixture->{common}/codex-workflow-runs" : "$fixture->{dest}/agent/progress/runs";
+            my $fixture = run_fixture(); my $directory = $kind eq 'runtime' ? "$fixture->{common}/codex-workflow-runs" : "$fixture->{repo}/agent/progress/runs";
             if ($kind eq 'runtime') { make_path($directory); chmod 0500, $directory or die $!; }
             my $hook = $kind eq 'projection' ? sub { return unless $_[0] eq 'before-projection'; make_path($directory); chmod 0500, $directory or die $!; } : undef;
             my ($status) = start_run($fixture, $mode, $hook); ok($status, "actual unwritable $kind directory fails");
             chmod 0700, $directory or die $!;
-            ok(!-e $fixture->{dest}, 'runtime allocation failure precedes Git setup') if $kind eq 'runtime';
+            is(git($fixture, 'branch', '--list', "change/$fixture->{slug}"), '', 'runtime allocation failure precedes Git setup') if $kind eq 'runtime';
             if ($kind eq 'projection') { is(state($fixture)->{phase_result}, 'failed', 'no prepared acknowledgement'); ($status) = invoke($fixture, $mode, undef, 'resume', '--run', $fixture->{id}); is($status, 0, 'restore storage and reconcile owned intent'); }
         }
     };
     subtest "$mode :: S003_T38_status_is_inspection" => sub {
         my $f = run_fixture(); start_run($f, $mode); my $path = "$f->{common}/codex-workflow-runs/$f->{id}/state.json"; my $before = slurp($path); my $refs = git($f, 'show-ref');
         my ($rc, $out, $err) = invoke($f, $mode, undef, 'status', '--run', $f->{id}); is($rc, 0, 'valid read'); my $o = decode_json($out); ok(!$o->{run_complete}, 'not approval'); ok(!$o->{inspection}{reconciliation_required}, 'consistent snapshot'); is(slurp($path), $before, 'state bytes unchanged'); is(git($f, 'show-ref'), $refs, 'refs unchanged');
+        write_file("$f->{repo}/unrelated", 'protected');
+        ($rc, $out) = invoke($f, $mode, undef, 'status', '--run', $f->{id});
+        is($rc, 0, 'dirty checkout is inspectable');
+        ok(!decode_json($out)->{inspection}{checkout_clean}, 'dirty checkout reported');
+        ok(decode_json($out)->{inspection}{reconciliation_required}, 'dirty checkout requires reconciliation');
+        is(slurp($path), $before, 'dirty inspection does not write state');
+        is(slurp("$f->{repo}/unrelated"), 'protected', 'dirty inspection preserves user file');
         my $owner = runner($f); $owner->lock($f->{slug}); ($rc, $out) = invoke($f, $mode, undef, 'status', '--run', $f->{id}); is($rc, 0, 'inspection works while owner active'); ok(decode_json($out)->{inspection}{active_writer}, 'active owner reported');
         write_file($path, '{'); ($rc) = invoke($f, $mode, undef, 'status', '--run', $f->{id}); ok($rc, 'malformed read fails'); is(slurp($path), '{', 'corrupt file not repaired by status');
     };

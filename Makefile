@@ -16,7 +16,7 @@ workflow-test:
 	perl scripts/test-unit-codex-review-loop.pl
 	perl scripts/test-unit-codex-change-write.pl
 	perl scripts/test-codex-session.pl
-	perl scripts/test-worktree.pl
+	perl scripts/test-clean-checkout.pl
 	bash scripts/test-codex-change-write.sh
 	bash scripts/test-change-review.sh
 	bash scripts/test-codex-code-implement.sh

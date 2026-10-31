@@ -109,7 +109,7 @@ for my $case (workflow_cases()) {
     like($error, qr/Git authentication is not ready.*git-auth\.sh.*retry/s, "$script explains how to proceed");
     is(git($f, 'show-ref'), $before, "$script leaves local refs unchanged");
     is(git($f->{remote}, 'show-ref'), $remote_before, "$script leaves remote refs unchanged");
-    is(git($f, 'status', '--porcelain'), $status_before, "$script leaves worktree and index unchanged");
+    is(git($f, 'status', '--porcelain'), $status_before, "$script leaves checkout and index unchanged");
     ok(!-e "$f->{bin}/remote-calls", "$script fails before any remote Git command");
     ok(!-e "$f->{bin}/codex-called", "$script fails before starting Codex");
 }

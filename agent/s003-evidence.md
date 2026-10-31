@@ -43,7 +43,7 @@ Schema 1 keeps authoritative runtime state/locks in common Git metadata and a
 sanitized portable projection under `agent/progress/runs/`. Pending publication
 is durable before portable replacement; prepared success is saved only after
 the projection is durable. Exact generation/digests reconcile interruptions.
-Worktree administration metadata binds the run owner. OS locks survive parent
+The earlier implementation bound the run owner through destination administration metadata; that mechanism is removed by the publisher's single-checkout correction. OS locks survive parent
 death while a supervised Git child can still mutate; the supervisor drains output
 after launcher death instead of exposing Git to a broken output pipe. Source or
 target drift, changed configuration/evidence, unknown ownership and unrelated
@@ -55,14 +55,14 @@ Both suites use [shared fixtures/cases](../scripts/test-lib/RunStateTest.pm):
   `U :: S003_T40`, exact authored names, 40 subtests / 413 assertions.
 - [Real-Git suite](../scripts/test-workflow-run-state.pl): `G :: S003_T01` through
   `G :: S003_T40`, 40 subtests / 428 assertions, including subprocess CLI calls,
-  linked worktrees, local bare remotes, actual permission failures and OS locks.
+  temporary repositories, local bare remotes, actual permission failures and OS locks.
 - Every S003-R01–R10/case mapping remains in the selected change. Tests exercise
   invalid/duplicate/absent inputs, scoped source/revision/result prerequisites,
   failed refresh, dirty/submodule preservation, nonforcing setup races, atomic
   write failures, post-rename reread, generation guards, exact projection dirt,
   stale/tampered publication, ownership, repeat resume, source/equal-tree/target
   drift, changed remote/evidence configuration, missing/moved/wrong-owner
-  worktrees and read-only inspection. Real SIGINT/SIGTERM and SIGKILL include
+  checkouts and read-only inspection. Real SIGINT/SIGTERM and SIGKILL include
   intent/Git/projection boundaries and active Git children, using FIFO barriers
   rather than timing-only sleeps. Required cases have no skips/TODOs. Recording
   command fixtures verify that preparation cannot dispatch later phases.
@@ -77,7 +77,7 @@ this tracked record retains the results and integrity identifiers.
 | `perl scripts/test-unit-workflow-run-state.pl` | Final module/owner-marker/publication implementation: 40/40 named cases, 413 assertions; `s003-unit-release.tap` SHA-256 `5305c6057a3a917581804181100db73317ffa679006f8796d31be6e556a60695` |
 | `perl scripts/test-workflow-run-state.pl` | Final implementation: 40/40 named cases, 428 assertions; `s003-git-release.tap` SHA-256 `aa5a68a591ea12c4d8f26c9a688380d503c0e8fc4e9d480e0933b7461c6186af` |
 | `make workflow-test` | Approved host run passed new suites and all existing evidence, implementation/review unit/real-Git, flow, merge/recovery, promotion, release initialization, auth, branch-creation and plan-dispatch regressions. Final S003 suites above were rerun after the final owner-marker/document-validator/clock-injection additions; unchanged legacy helpers were not modified. Host log `s003-workflow-host.log` SHA-256 `3938687ea6311e2e1dfdbaa19fa4f3117aacad5195529974c1819d68610a9f4b` |
-| `perl scripts/test-worktree.pl` | Existing 775 assertions passed; `s003-worktree.log` SHA-256 `cb2f00442182ee589c87f5aebabcfbfacddd526b1fc59dbba21efba6ed79c647` |
+| Legacy dirty-checkout suite (now `perl scripts/test-clean-checkout.pl`) | Existing 775 assertions passed; the legacy dirty-checkout log SHA-256 `cb2f00442182ee589c87f5aebabcfbfacddd526b1fc59dbba21efba6ed79c647` |
 | `python3 tool/check_scaffold.py` | Existing S001/S002 architecture/setup contract valid |
 | `python3 -m unittest discover -s tool/tests -v` | All 71 tests passed; `s003-python.log` SHA-256 `241eabb9858af88ab601c239505a4b9f333d5634e78c21699d19e0cd11461167` |
 | `make unit-test` | Approved host run: 71 Python, 32 core Dart, 53 Flutter tests; handwritten Dart line coverage **103/103 (100%)**; branch coverage unavailable from the reporter. Source inventory SHA-256 `e6a21bdc34bdf8eff9b6c95d2b375d29ba6324e380045ac433b7aea2424283c6`; `build/test-results/unit/summary.json`, `coverage/lcov.info`; temporary host log SHA-256 `6e2d0acdf32b2b051d2dcc6ee63c51bf589d9cabf7906b770ba52950d4d76051` |

@@ -264,7 +264,7 @@ sub select_temp_root {
 	return;
 }
 
-sub ensure_clean_worktree {
+sub ensure_clean_checkout {
 	my ($changes, $status) = capture_command(0, 'git', 'status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none');
 	$status == 0 or exit $status;
 	if ($changes ne '') {
@@ -290,7 +290,7 @@ sub main {
 	$repo_root =~ s/\s+\z//;
 	chdir $repo_root or fail("cannot enter repository $repo_root: $!");
 	my $repo_root_physical = abs_path(getcwd());
-	ensure_clean_worktree();
+	ensure_clean_checkout();
 	command_exists('codex') or fail('codex is not installed or is not on PATH');
 
 	my ($branch, $branch_status) = capture_command(1, 'git', 'symbolic-ref', '--quiet', '--short', 'HEAD');
@@ -343,7 +343,7 @@ sub main {
 	run_checked('git', 'add', '-A');
 	run_checked('git', 'commit', '-m', $commit_message);
 	run_checked('git', 'push', '-u', 'origin', $branch);
-	ensure_clean_worktree();
+	ensure_clean_checkout();
 	return 0;
 }
 

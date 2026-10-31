@@ -101,7 +101,7 @@ for my $stale_tracking_ref (0, 1) {
 $f = change_fixture();
 write_file("$f->{repo}/dirty", 'untracked');
 ($status, $out, $error) = run_script($f, $script);
-is($status, 1, 'dirty worktree rejected');
+is($status, 1, 'dirty checkout rejected');
 like($error, qr/error: Uncommitted work detected\./, 'dirty error explained');
 unlink "$f->{repo}/dirty" or die $!;
 commit_file($f, 'unpublished');

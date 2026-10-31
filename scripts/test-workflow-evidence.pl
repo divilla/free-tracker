@@ -94,13 +94,12 @@ subtest 'WF-EVIDENCE-R04 stale failed interrupted or document reviews never pass
     is(delivery_status($slug, 'dev')->{integration}, 'verified', 'interrupted new attempt does not undo existing Git integration');
 };
 
-subtest 'WF-EVIDENCE-R02 shared worktrees see same receipts' => sub {
-    my $linked = "$f->{repo}-linked";
-    git($f, 'worktree', 'add', '--detach', $linked, 'dev');
-    chdir $linked or die $!;
+subtest 'WF-EVIDENCE-R02 branch switches preserve receipts' => sub {
+    my $before = delivery_status($slug, 'dev');
+    git($f, 'checkout', '--detach', '-q', 'dev');
     my $state = delivery_status($slug, 'dev');
-    ok(@{$state->{receipts}} > 0, 'shared common Git directory retains evidence across worktrees');
-    chdir $f->{repo} or die $!;
+    is_deeply($state->{receipts}, $before->{receipts}, 'Git metadata retains receipts across branch switches');
+    git($f, 'checkout', '-q', 'dev');
 };
 
 subtest 'WF-EVIDENCE-R04 malformed and incomplete observations do not become success' => sub {
@@ -123,7 +122,7 @@ subtest 'WF-EVIDENCE-R04 malformed and incomplete observations do not become suc
     unlink $conflict or die $!;
     eval { save_receipt('../escape', $merge) };
     like($@, qr/invalid evidence slug/, 'path traversal rejected');
-    my $root = git($f, 'rev-parse', '--git-common-dir') . '/mch-workflow-evidence';
+    my $root = git($f, 'rev-parse', '--absolute-git-dir') . '/mch-workflow-evidence';
     write_file("$root/127-unwritable", 'not a directory');
     eval { save_receipt('127-unwritable', $merge) };
     ok($@, 'filesystem failure cannot report publication success');
