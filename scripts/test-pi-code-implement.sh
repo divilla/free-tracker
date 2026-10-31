@@ -23,6 +23,7 @@ export MCH_GIT_SSH_KEY="$test_root/test-key"
 printf '%s\n' '# Domain types' >"$repo/agent/changes/000-domain-types.md"
 printf '%s\n' '# Failing change' >"$repo/agent/changes/001-failing-change.md"
 printf '%s\n' '# Incomplete response change' >"$repo/agent/changes/002-incomplete-response.md"
+printf '%s\n' '# Switched branch change' >"$repo/agent/changes/003-switched-branch.md"
 printf '%s\n' 'old production' >"$repo/production.go"
 
 cat >"$fake_bin/pi" <<'EOF'
@@ -45,9 +46,18 @@ if [[ ${PI_TEST_FAIL-} == 1 ]]; then
 fi
 
 if [[ ${PI_TEST_INCOMPLETE_STOP-} == 1 ]]; then
-	# Pi exited zero after an error response, having already made partial edits.
+	# Pi exited zero after an error response, having already made partial edits;
+	# the provider failure is only reported in the structured errorMessage.
 	printf '%s\n' 'partial implementation' >production.go
-	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error"}}'
+	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"provider request failed: rate limited"}}'
+	exit 0
+fi
+
+if [[ ${PI_TEST_SWITCH_BRANCH-} == 1 ]]; then
+	# Pi moved HEAD to another branch at the same commit while editing files.
+	printf '%s\n' 'imposter implementation' >production.go
+	git checkout -q -b imposter-branch
+	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Implementation complete."}],"stopReason":"stop"}}'
 	exit 0
 fi
 
@@ -119,10 +129,38 @@ set -e
 [[ $incomplete_status -eq 1 ]]
 grep -Fxq 'Pi session ID: implementation-session' "$incomplete_output"
 grep -Fxq "pi-code-implement: Pi final assistant response ended with stopReason 'error', not 'stop'" "$incomplete_error"
+grep -Fxq 'pi-code-implement: Pi assistant error message:' "$incomplete_error"
+grep -Fxq '  provider request failed: rate limited' "$incomplete_error"
 [[ $(git -C "$repo" log -1 --format=%s) == initial ]]
 ! git -C "$repo" rev-parse --verify --quiet refs/remotes/origin/change/002-incomplete-response
 [[ $(<"$repo/production.go") == 'partial implementation' ]]
 [[ -n $(git -C "$repo" status --short) ]]
+
+# PI-IMPLEMENT-BRANCH-SWITCH: Pi switching to another branch at the same commit
+# must be rejected before staging; the implementation stays uncommitted and the
+# change branch is never pushed.
+git -C "$repo" checkout -q -- .
+git -C "$repo" checkout -q master
+git -C "$repo" checkout -q -b change/003-switched-branch
+switched_output="$test_root/switched-output"
+switched_error="$test_root/switched-error"
+set +e
+(
+	cd "$repo"
+	PATH="$fake_bin:$PATH" PI_TEST_SWITCH_BRANCH=1 ./scripts/pi-code-implement.pl
+) >"$switched_output" 2>"$switched_error"
+switched_status=$?
+set -e
+[[ $switched_status -eq 1 ]]
+grep -Fxq 'Pi session ID: implementation-session' "$switched_output"
+grep -Fxq 'Implementation complete.' "$switched_output"
+grep -Fxq 'pi-code-implement: Pi changed branches; refusing to commit' "$switched_error"
+[[ $(git -C "$repo" branch --show-current) == imposter-branch ]]
+[[ $(git -C "$repo" log -1 --format=%s) == initial ]]
+! git -C "$repo" rev-parse --verify --quiet refs/remotes/origin/change/003-switched-branch
+[[ $(<"$repo/production.go") == 'imposter implementation' ]]
+[[ -n $(git -C "$repo" status --short) ]]
+[[ -z $(git -C "$repo" diff --cached --name-only) ]]
 
 set +e
 (

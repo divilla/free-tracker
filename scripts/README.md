@@ -456,14 +456,21 @@ the same clean-tree, branch, result, commit, push, progress, failure, and
 interruption guarantees as the Codex implementation helper. A final assistant
 event whose `stopReason` is not `stop` (for example `error`, `aborted` or
 `length`) is rejected before any commit: Pi JSON mode can exit zero after an
-incomplete response, so partial work stays uncommitted for inspection.
+incomplete response, so partial work stays uncommitted for inspection, and the
+assistant message's structured `errorMessage` is printed first so provider
+failures (authentication, rate limits, model errors) remain diagnosable after
+cleanup. Before staging, the script also verifies that `HEAD` is unchanged and
+that Pi still has the change branch checked out, so a same-commit branch switch
+by Pi is never committed and pushed onto the original branch.
 
 `pi-review-loop.pl` keeps Codex for every `codex exec review` pass. Only a pass
 with findings hands those findings to `$mch-findings-fix` on stdin through
 `pi -p --mode json --thinking high --approve`. The loop parses Pi's final
 assistant event into its temporary fix-result file, rejecting any final event
 that did not complete with `stopReason: "stop"` so incomplete fixes are never
-committed, reports the Pi session ID, and retains the same Codex review
+committed; on such a final event the assistant message's structured
+`errorMessage` is printed before cleanup so provider failures stay diagnosable.
+The loop reports the Pi session ID, and retains the same Codex review
 options, scope checks, commits, pushes, and re-review behavior as
 `codex-review-loop.pl`.
 

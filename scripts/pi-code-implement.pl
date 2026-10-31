@@ -83,21 +83,25 @@ sub assistant_text_from_message {
 	return $text;
 }
 
-# Returns the final assistant response together with its stop reason. JSON mode
-# can exit zero after an assistant message that stopped with "error", "aborted",
-# "length" or another non-success reason; only "stop" is a completed response.
+# Returns the final assistant response together with its stop reason and, when
+# the provider reported one, the assistant message's structured errorMessage.
+# JSON mode can exit zero after an assistant message that stopped with "error",
+# "aborted", "length" or another non-success reason; only "stop" is a
+# completed response.
 sub final_response_from_pi_output {
 	my ($output) = @_;
-	my ($response, $stop_reason);
+	my ($response, $stop_reason, $error_message);
 	for my $line (split /\n/, $output) {
 		my $event = eval { decode_json($line) };
 		next if ref($event) ne 'HASH' || ($event->{type} // '') ne 'message_end';
 		next if ref($event->{message}) ne 'HASH' || ($event->{message}{role} // '') ne 'assistant';
 		my $reason = $event->{message}{stopReason};
 		$stop_reason = defined $reason && !ref($reason) ? $reason : '(missing)';
+		my $error = $event->{message}{errorMessage};
+		$error_message = defined $error && !ref($error) ? $error : undef;
 		$response = assistant_text_from_message($event->{message});
 	}
-	return ($response, $stop_reason);
+	return ($response, $stop_reason, $error_message);
 }
 
 sub shell_quote {
@@ -310,10 +314,14 @@ sub run_pi {
 		}
 	}
 	else {
-		my ($response, $stop_reason) = final_response_from_pi_output($output);
+		my ($response, $stop_reason, $error_message) = final_response_from_pi_output($output);
 		fail('Pi did not emit a final assistant response') if !defined $response;
 		if ($stop_reason ne 'stop') {
 			print STDERR "pi-code-implement: Pi final assistant response ended with stopReason '$stop_reason', not 'stop'\n";
+			if (defined $error_message) {
+				$error_message =~ s/^/  /mg;
+				print STDERR "pi-code-implement: Pi assistant error message:\n$error_message\n";
+			}
 			if (-s $active_error_log) {
 				my $errors = read_file($active_error_log);
 				$errors =~ s/^/  /mg;
@@ -416,6 +424,11 @@ sub main {
 	$after_implementation =~ s/\s+\z//;
 	$after_implementation eq $before_implementation
 		or fail('Pi created a commit; expected this script to commit the implementation');
+
+	my ($current_branch, $current_branch_status) = capture_command(0, 'git', 'branch', '--show-current');
+	$current_branch_status == 0 or exit $current_branch_status;
+	$current_branch =~ s/\s+\z//;
+	$current_branch eq $branch or fail('Pi changed branches; refusing to commit');
 
 	my ($changed_files, $changed_status) = capture_command(0, 'git', 'status', '--short', '--untracked-files=all', '--', '.');
 	$changed_status == 0 or exit $changed_status;

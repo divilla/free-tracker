@@ -94,6 +94,29 @@ assert_equal($unlabelled_response, 'unlabelled',
 	'LOOP-PI-RESULT: an unlabelled response still yields its text for reporting');
 assert_equal($unlabelled_stop_reason, '(missing)',
 	'LOOP-PI-RESULT: a missing stop reason must be surfaced for rejection');
+my ($structured_response, $structured_stop_reason, $structured_error_message) = final_response_from_pi_output(
+	join("\n",
+		'{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"earlier provider failure"}}',
+		'{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"provider request failed: rate limited"}}')
+);
+assert_equal($structured_response, '',
+	'LOOP-PI-RESULT: an error response still yields its text for reporting');
+assert_equal($structured_stop_reason, 'error',
+	'LOOP-PI-RESULT: an error stop reason must be surfaced for rejection');
+assert_equal($structured_error_message, 'provider request failed: rate limited',
+	'LOOP-PI-RESULT: the final assistant errorMessage is surfaced for diagnosis');
+my (undef, undef, $recovered_error_message) = final_response_from_pi_output(
+	join("\n",
+		'{"type":"message_end","message":{"role":"assistant","content":"interrupted","stopReason":"error","errorMessage":"earlier provider failure"}}',
+		'{"type":"message_end","message":{"role":"assistant","content":"recovered","stopReason":"stop"}}')
+);
+assert_equal($recovered_error_message, undef,
+	'LOOP-PI-RESULT: a later completion clears the earlier errorMessage');
+my (undef, undef, $non_string_error_message) = final_response_from_pi_output(
+	'{"type":"message_end","message":{"role":"assistant","content":"damaged","stopReason":"error","errorMessage":["not","a","string"]}}'
+);
+assert_equal($non_string_error_message, undef,
+	'LOOP-PI-RESULT: a non-string errorMessage is ignored');
 
 my $rendered = '';
 open my $progress_output, '>:raw', \$rendered or die "cannot create progress capture: $!";

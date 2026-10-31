@@ -126,9 +126,10 @@ if [[ ${PI_TEST_OMIT_FINAL_RESPONSE-} == 1 ]]; then
 	exit 0
 fi
 if [[ ${PI_TEST_INCOMPLETE_STOP-} == 1 ]]; then
-	# Pi exited zero after an error response, having already made partial edits.
+	# Pi exited zero after an error response, having already made partial edits;
+	# the provider failure is only reported in the structured errorMessage.
 	printf '%s\n' 'Partially applied fix.' >>agent/changes/001-test-change.md
-	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error"}}'
+	printf '%s\n' '{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"provider request failed: authentication expired"}}'
 	exit 0
 fi
 if [[ "$prompt" == *' --code' ]]; then
@@ -253,6 +254,8 @@ set -e
 [[ $incomplete_status -eq 1 ]]
 grep -Fxq 'Pi session ID: fix-session.01' "$incomplete_output"
 grep -Fxq "pi-review-loop: Pi final assistant response ended with stopReason 'error', not 'stop'" "$incomplete_error"
+grep -Fxq 'pi-review-loop: Pi assistant error message:' "$incomplete_error"
+grep -Fxq '  provider request failed: authentication expired' "$incomplete_error"
 [[ $(git -C "$repo" rev-parse HEAD) == "$head_before" ]]
 [[ $(git -C "$repo" rev-parse "origin/$branch") == "$head_before" ]]
 grep -Fq 'Partially applied fix.' "$repo/$change"
