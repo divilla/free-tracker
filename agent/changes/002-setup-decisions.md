@@ -94,6 +94,10 @@ Evidence entries in **Checks and handoff** distinguish `recorded historical`, `e
 
 All **S002** tests below are **planned**, not existing/passing tests. **U** expands to `tool/tests/test_scaffold_contract.py`; each identifier includes the exact Python `test_` method prefix. Use separate subtests for each listed independently failing field/variant and assert diagnostic field/path and rejection, not just execution. Complete valid fixtures must preserve the actual baseline links/configuration. All requirements have identifiable unit tests for the checkable handoff contract; a validator cannot establish device/account/source truth. The additional evidence column retains those manual/external obligations.
 
+### Unit-only tooling cases
+
+The publisher clarified applicability on 2026-10-31 in [S003](003-fix-tests.md) and PLAN §2: all 20 cases below remain mandatory unit tests with their original IDs and assertions. None exercises Android app behavior, so this increment has no Android E2E case table. This classification does not remove external evidence obligations or change historical execution results.
+
 | Case ID | Requirement(s) / Cxx | Fixture, action, expected assertions | Unit test (`file :: name`) | Additional test / evidence |
 | --- | --- | --- | --- | --- |
 | S002-T01 | R01; C01 | Valid record matches exact name/ID and settled scope constraints; accepted without file mutation | `U :: test_S002_T01_identity_and_constraints_match` | Inspect actual Android/composition/PRD values; existing S001 T01/T03 and Android `S001_P01_real_android_metadata` corroborate runtime identity |
