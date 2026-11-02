@@ -1,29 +1,5 @@
 # Tour Finite State Machine
 
-States:
-- Idle
-- Recording
-- Paused
-- Finished
-
-Transitions:
-- IdleState      -> _start_            -> RecodingState
-- RecordingState -> _manual_pause_     -> PausedState
-- RecordingState -> _automatic_pause_  -> PausedState
-- RecordingState -> _stop_             -> FinishedState
-- PausedState    -> _manual_resume_    -> RecordingState
-- PausedState    -> _automatic_resume_ -> RecordingState
-- FinishedState  -> _continue_         -> RecordingState
-- FinishedState  -> _delete_           -> Deleted
-
-*_automatic_resume_ can resume only PausedState reached by _automatic_pause_. _manual_resume_ can resume both _manual_pause_ and _automatic_pause_.*
-*_stop_ flags Tour `is_saved` -> from there it can be flagged `is_active` or `is_deleted`. Only one Tour can be active.
-
-States:
-- Idle   -> New Unstarted Tour
-- Active -> Recording/Paused/Finished
-- Saved  -> It can be accessed in history
-
 ## Screens
 
 - Tour
@@ -60,9 +36,10 @@ Tour consist of:
 -----------------------------
 | Start    | StartDate      |<br>
 | Pause    | StartTime      |<br>
-| Resume   | ElapsedTime    |<br>
-| Stop     | TotalDistance  |<br>
-| Continue | Cur | AvgSpeed |<br>
+| Resume   | TotalDistance  |<br>
+| Stop     | ElapsedTime    |<br>
+| Continue | AverageSpeed   |<br>
+| New Tour | CurrentSpeed   |<br>
 -----------------------------
 |      Navigation  Bar      |<br>
 -----------------------------
@@ -71,29 +48,65 @@ Tour consist of:
 
 Each item contains:
 1. Line - StartTime
-2. Line - ElapsedTime | AverageSpeed
+2. Line - TotalDistance | ElapsedTime
 3. Line - OpenButton
 
 **Wireframe**:
-----------------------
-| 2026-10-01 15:21   |<br>
-| 00:17:18 21.1 km/h |<br>
-|      Open          |<br>
-----------------------
-| 2026-09-11 15:21   |<br>
-| 00:17:18 21.1 km/h |<br>
-|      Open          |<br>
-----------------------
-| 2026-09-01 15:21   |<br>
-| 00:17:18 21.1 km/h |<br>
-|      Open          |<br>
-----------------------
-|  Navigation  Bar   |<br>
-----------------------
+-----------------------
+| 2026-10-01 15:21    |<br>
+| 21.101 km  00:17:18 |<br>
+|        Open         |<br>
+-----------------------
+| 2026-09-11 15:21    |<br>
+| 21.101 km  00:17:18 |<br>
+|        Open         |<br>
+-----------------------
+| 2026-09-01 15:21    |<br>
+| 21.101 km  00:17:18 |<br>
+|        Open         |<br>
+-----------------------
+|        ...          |<br>
+-----------------------
+|   Navigation Bar    |<br>
+-----------------------
 
 ### Exit
 
 - click on Exit pops `Are you sure? Yes/No` confirmation dialog in center and 
 - app exits on Yes - OnExitEvent is triggered that 
-  - executes _manual_resume_/_stop_ flow if in PausedState
-  - executes _stop_ if in RecordingState
+- executes _manual_resume_/_stop_ flow if in PausedState
+- executes _stop_ if in RecordingState
+
+## App Start
+
+On app start new empty tour in IdleState is show. If there is saved tour where date part of StartDateTime == current date (today) then open that tour instead.
+
+## Tour Base States
+
+DB names:
+- recording
+- paused
+- finished
+
+Transitions:
+- IdleState      -> _start_            -> RecodingState
+- RecordingState -> _manual_pause_     -> PausedState
+- RecordingState -> _automatic_pause_  -> PausedState
+- RecordingState -> _stop_             -> FinishedState
+- PausedState    -> _manual_resume_    -> RecordingState
+- PausedState    -> _automatic_resume_ -> RecordingState
+- FinishedState  -> _continue_         -> RecordingState
+- FinishedState  -> _delete_           -> DeletedState
+
+*IdleState means it is not yet saved to DB. DeletedState means its deleted from DB.*
+
+*_automatic_resume_ can resume only PausedState reached via _automatic_pause_. _manual_resume_ can resume both _manual_pause_ and _automatic_pause_.*
+
+States:
+- Idle   -> New Unstarted Tour
+- Active -> Recording/Paused/Finished
+- Saved  -> It can be accessed in history
+
+## Tour Active States
+
+States
